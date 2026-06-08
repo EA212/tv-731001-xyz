@@ -45,4 +45,8 @@ next-env.d.ts
 .edgeone/*
 !.edgeone/project.json
 .tef_dist/*
-  
+ 
+# jilaoTV
+/node_modules
+package-lock.json
+db.json

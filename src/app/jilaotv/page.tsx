@@ -1,0 +1,769 @@
+/* eslint-disable @next/next/no-img-element */
+"use client"
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2 } from 'lucide-react'
+
+// 类型定义
+interface MovieItem {
+  id: number
+  title?: string
+  name?: string
+  poster_path: string
+  vote_average: number
+  release_date?: string
+  first_air_date?: string
+  overview?: string
+  backdrop_path?: string
+}
+
+interface SearchResult {
+  vod_name: string
+  vod_pic: string
+  vod_id: string
+  site_key: string
+  site_name: string
+  latency?: number
+}
+
+interface Episode {
+  name: string
+  url: string
+}
+
+interface Source {
+  site_name: string
+  site_key: string
+  vod_id: string
+  latency?: number | string
+}
+
+interface Group {
+  name: string
+  pic: string
+  sources: Source[]
+}
+
+interface DPlayerInstance {
+  destroy: () => void
+}
+
+interface DPlayerConstructor {
+  new (options: {
+    container: HTMLElement
+    screenshot: boolean
+    autoplay: boolean
+    video: { url: string; type?: string }
+  }): DPlayerInstance
+}
+
+declare global {
+  interface Window {
+    DPlayer?: DPlayerConstructor
+  }
+}
+
+export default function JilaotvPage() {
+  // 状态管理
+  const [keyword, setKeyword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const [rawList, setRawList] = useState<SearchResult[]>([])
+  const [movieList, setMovieList] = useState<MovieItem[]>([])
+  const [tvList, setTvList] = useState<MovieItem[]>([])
+  const [listCn, setListCn] = useState<MovieItem[]>([])
+  const [listKrjp, setListKrjp] = useState<MovieItem[]>([])
+  const [heroList, setHeroList] = useState<{title: string; overview: string; backdrop: string}[]>([])
+  const [scrollY, setScrollY] = useState(0)
+  const [showDetail, setShowDetail] = useState(false)
+  const [currentGroup, setCurrentGroup] = useState<Group | null>(null)
+  const [currentSource, setCurrentSource] = useState<Source | null>(null)
+  const [episodeList, setEpisodeList] = useState<Episode[]>([])
+  const [currentUrl, setCurrentUrl] = useState('')
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [imageMap, setImageMap] = useState<Record<string, string>>({})
+  const [fallbackMap, setFallbackMap] = useState<Record<string, boolean>>({})
+  const dplayerRef = useRef<{ destroy: () => void } | null>(null)
+
+  const TMDB_API_KEY = 'c36cafd8b15f8b30f416867cfef1b01d'
+  const MY_PROXY = 'https://daili.smdhb.com'
+  const TMDB_BASE_URL = `${MY_PROXY}/3`
+  const TMDB_IMG_URL = `${MY_PROXY}/t/p/w500`
+  const TMDB_BACKDROP_URL = `${MY_PROXY}/t/p/original`
+
+  // 滚动事件监听
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY)
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // 获取所有榜单数据
+  const fetchAllLists = useCallback(async () => {
+    try {
+      const [movieRes, tvRes, cnRes, krjpRes] = await Promise.all([
+        fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
+        fetch(`${TMDB_BASE_URL}/trending/tv/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
+        fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=CN&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`),
+        fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=KR|JP&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`)
+      ])
+      
+      const [movieData, tvData, cnData, krjpData] = await Promise.all([
+        movieRes.json(),
+        tvRes.json(),
+        cnRes.json(),
+        krjpRes.json()
+      ])
+
+      setMovieList(movieData.results || [])
+      setTvList(tvData.results || [])
+      setListCn(cnData.results || [])
+      setListKrjp(krjpData.results || [])
+    } catch {
+      // 静默失败
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 获取 Hero 轮播数据
+  const fetchHero = useCallback(async () => {
+    try {
+      const res = await fetch(`${TMDB_BASE_URL}/trending/all/week?api_key=${TMDB_API_KEY}&language=zh-CN`)
+      const data = await res.json()
+      
+      if (data.results) {
+        const heroes = data.results
+          .filter((item: MovieItem) => item.backdrop_path)
+          .slice(0, 5)
+          .map((item: MovieItem) => ({
+            title: item.title || item.name || '',
+            overview: item.overview || '精彩内容不容错过',
+            backdrop: `${TMDB_BACKDROP_URL}${item.backdrop_path}`
+          }))
+        setHeroList(heroes)
+      }
+    } catch {
+      // 静默失败
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 初始化数据
+  useEffect(() => {
+    fetchAllLists()
+    fetchHero()
+  }, [fetchAllLists, fetchHero])
+
+  // DPlayer 初始化
+  useEffect(() => {
+    if (!currentUrl || !showDetail) return
+
+    const initPlayer = () => {
+      const container = document.getElementById('dplayer')
+      if (!container) return
+
+      // 销毁旧实例
+      if (dplayerRef.current) {
+        try {
+          dplayerRef.current.destroy()
+        } catch {
+          // 忽略销毁错误
+        }
+        dplayerRef.current = null
+      }
+
+      // 创建新实例
+      const isHls = currentUrl.includes('.m3u8')
+      const DPlayer = window.DPlayer
+      
+      if (DPlayer) {
+        try {
+          dplayerRef.current = new DPlayer({
+            container: container,
+            screenshot: false,
+            autoplay: true,
+            video: isHls ? {
+              url: currentUrl,
+              type: 'hls'
+            } : {
+              url: currentUrl
+            }
+          })
+        } catch (error) {
+          console.error('DPlayer init failed:', error)
+        }
+      }
+    }
+
+    // 等待 DPlayer 脚本加载
+    if (window.DPlayer) {
+      initPlayer()
+    } else {
+      const checkInterval = setInterval(() => {
+        if (window.DPlayer) {
+          clearInterval(checkInterval)
+          initPlayer()
+        }
+      }, 100)
+      
+      setTimeout(() => clearInterval(checkInterval), 5000)
+    }
+
+    return () => {
+      if (dplayerRef.current) {
+        try {
+          dplayerRef.current.destroy()
+        } catch {
+          // 忽略销毁错误
+        }
+        dplayerRef.current = null
+      }
+    }
+  }, [currentUrl, showDetail])
+
+  // 搜索功能
+  const doSearch = async () => {
+    if (!keyword.trim()) return
+    
+    setLoading(true)
+    setSearched(true)
+    setRawList([])
+    
+    try {
+      const res = await fetch(`/api/search?wd=${encodeURIComponent(keyword.trim())}`)
+      const data = await res.json()
+      setRawList(data.list || [])
+      
+      data.list?.forEach((item: SearchResult) => {
+        if (!item.vod_pic || item.vod_pic.includes('mac_default')) {
+          handleImgError(item.vod_name)
+        }
+      })
+    } catch (error) {
+      console.error('Search failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 图片错误处理
+  const handleImgError = async (name: string) => {
+    if (imageMap[name] || fallbackMap[name]) return
+    setFallbackMap(prev => ({ ...prev, [name]: true }))
+    
+    const cleanName = name.replace(/第[0-9一二三四五六七八九十]+[季部]/g, '')
+      .replace(/Season\s*\d+/ig, '')
+      .replace(/S\d{1,2}/ig, '')
+      .replace(/(HD|BD|1080P|720P|4K|202\d|TC|TS).*/i, '')
+      .trim()
+    
+    try {
+      const res = await fetch(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&language=zh-CN`)
+      const data = await res.json()
+      
+      if (data.results && data.results.length > 0) {
+        const found = data.results.find((i: MovieItem) => i.poster_path) || data.results[0]
+        if (found.poster_path) {
+          setImageMap(prev => ({ ...prev, [name]: `${TMDB_IMG_URL}${found.poster_path}` }))
+          setFallbackMap(prev => ({ ...prev, [name]: false }))
+        }
+      }
+    } catch (error) {
+      console.error('Image fallback failed:', error)
+    }
+  }
+
+  // 自动搜索
+  const autoSearch = (name: string) => {
+    setKeyword(name)
+    doSearch()
+    
+    setTimeout(() => {
+      const anchor = document.getElementById('search-result-anchor')
+      anchor?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }
+
+  // 清除搜索
+  const clearSearch = () => {
+    setSearched(false)
+    setKeyword('')
+    setRawList([])
+  }
+
+  // 计算分组列表
+  const groupedList = () => {
+    const groups: Record<string, Group> = {}
+    
+    rawList.forEach(item => {
+      const name = item.vod_name
+      if (!groups[name]) {
+        groups[name] = { name, pic: item.vod_pic, sources: [] }
+      }
+      
+      const isDefault = (url: string | undefined) => !url || url?.includes('mac_default') || url?.includes('nopic')
+      if (isDefault(groups[name].pic) && !isDefault(item.vod_pic)) {
+        groups[name].pic = item.vod_pic
+      }
+      if (isDefault(groups[name].pic)) {
+        handleImgError(name)
+      }
+      
+      groups[name].sources.push({
+        site_name: item.site_name,
+        site_key: item.site_key,
+        vod_id: item.vod_id,
+        latency: item.latency || 999
+      })
+    })
+    
+    return Object.values(groups).sort((a, b) => b.sources.length - a.sources.length)
+  }
+
+  // 获取最终海报
+  const finalPoster = (item: MovieItem | Group, isHot = false) => {
+    const name = isHot ? (item as MovieItem).title || (item as MovieItem).name || '' : (item as Group).name
+    return imageMap[name] || (isHot ? `https://daili.smdhb.com/t/p/w300${(item as MovieItem).poster_path}` : (item as Group).pic)
+  }
+
+  // 判断是否使用 fallback
+  const isFallback = (name: string) => fallbackMap[name] === true
+
+  // 打开详情页
+  const openDetail = (group: Group) => {
+    setCurrentGroup(group)
+    setShowDetail(true)
+    
+    group.sources.forEach(source => {
+      source.latency = '...'
+      fetch(`/api/check?key=${source.site_key}`)
+        .then(res => res.json())
+        .then(data => {
+          setCurrentGroup(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              sources: prev.sources.map(s => 
+                s.site_key === source.site_key ? { ...s, latency: data.latency } : s
+              )
+            }
+          })
+        })
+    })
+    
+    const best = group.sources[0]
+    switchSource(best)
+  }
+
+  // 关闭详情页
+  const closeDetail = () => {
+    setShowDetail(false)
+  }
+
+  // 切换线路
+  const switchSource = async (source: Source) => {
+    setCurrentSource(source)
+    setLoadingDetail(true)
+    setEpisodeList([])
+    
+    try {
+      const res = await fetch(`/api/detail?site_key=${source.site_key}&id=${source.vod_id}`)
+      const data = await res.json()
+      
+      if (data.list && data.list.length > 0) {
+        parseEpisodes(data.list[0].vod_play_url)
+      }
+    } catch (e) {
+      console.error('Failed to fetch detail:', e)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  // 解析集数
+  const parseEpisodes = (urlStr: string) => {
+    let playSource = urlStr
+    if (urlStr.includes('$$$')) {
+      const sets = urlStr.split('$$$')
+      playSource = sets.find(s => s.toLowerCase().includes('m3u8')) || sets[0]
+    }
+    
+    const episodes = playSource.split('#').map(ep => {
+      const p = ep.split('$')
+      return { name: p.length > 1 ? p[0] : '正片', url: p.length > 1 ? p[1] : p[0] }
+    })
+    
+    setEpisodeList(episodes)
+    if (episodes.length > 0) {
+      play(episodes[0].url)
+    }
+  }
+
+  // 播放视频
+  const play = (url: string) => {
+    setCurrentUrl(url)
+    // DPlayer 初始化将在 useEffect 中处理
+  }
+
+  // 获取延迟等级
+  const getLatencyClass = (ms: number | string) => {
+    const numMs = typeof ms === 'string' ? 999 : ms
+    return numMs < 500 ? 'dot-green' : (numMs < 2000 ? 'dot-yellow' : 'dot-red')
+  }
+
+  // 滚动热榜
+  const scrollHotRow = (section: string, direction: 'prev' | 'next') => {
+    const hotRow = document.querySelector(`[data-section="${section}"]`) as HTMLElement
+    if (!hotRow) return
+    
+    const cardWidth = 164
+    const scrollAmount = cardWidth * 3
+    
+    hotRow.scrollBy({
+      left: direction === 'prev' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    })
+  }
+
+  // HotCard 组件
+  const HotCard = ({ item }: { item: MovieItem }) => {
+    const name = item.title || item.name || ''
+    const date = item.release_date?.split('-')[0] || item.first_air_date?.split('-')[0] || ''
+    
+    return (
+      <div 
+        className="hot-card" 
+        onClick={() => autoSearch(name)}
+        data-section={item.backdrop_path ? 'hero' : ''}
+      >
+        <div className="poster-wrap">
+          <img 
+            src={`https://daili.smdhb.com/t/p/w300${item.poster_path}`} 
+            alt={name}
+            loading="lazy"
+          />
+          <div className="rating-badge">
+            <Star className="w-3 h-3 text-warning fill-warning mr-1" />
+            {item.vote_average.toFixed(1)}
+          </div>
+        </div>
+        <div className="movie-name">{name}</div>
+        <div className="movie-date">{date}</div>
+      </div>
+    )
+  }
+
+  // ResultCard 组件
+  const ResultCard = ({ group }: { group: Group }) => {
+    return (
+      <div className="result-card" onClick={() => openDetail(group)}>
+        <div className="poster-wrap">
+          {!isFallback(group.name) ? (
+            <img 
+              src={finalPoster(group)} 
+              alt={group.name}
+              referrerPolicy="no-referrer"
+              onError={() => handleImgError(group.name)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="poster-fallback">
+              <Film className="w-12 h-12 mb-2 opacity-50" />
+              <div style={{ fontSize: '12px', color: '#999' }}>{group.name}</div>
+            </div>
+          )}
+          <div className="rating-badge" style={{ background: '#e50914', color: '#fff', border: 'none' }}>
+            {group.sources.length} 源
+          </div>
+        </div>
+        <div className="movie-name">{group.name}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-[#141414] text-white">
+      {/* 导航栏 */}
+      <nav className={`navbar-custom fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 50 ? 'scrolled' : ''}`}>
+        <div className="brand">机佬TV <span className="text-xs text-gray-500 font-normal">MAX</span></div>
+      </nav>
+
+      {/* Hero 轮播 */}
+      {heroList.length > 0 && (
+        <div id="heroCarousel" className="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="6000">
+          <div className="carousel-inner">
+            {heroList.map((item, index) => (
+              <div key={index} className={`carousel-item ${index === 0 ? 'active' : ''}`}>
+                <div className="hero-bg" style={{ backgroundImage: `url(${item.backdrop})` }}></div>
+                <div className="hero-overlay">
+                  <div className="hero-content">
+                    <div className="hero-tag">本周 TOP {index + 1}</div>
+                    <h1 className="hero-title">{item.title}</h1>
+                    <p className="hero-desc">{item.overview}</p>
+                    <div className="hero-btns">
+                      <button className="btn-play" onClick={() => autoSearch(item.title)}>
+                        <Play className="w-5 h-5 mr-2" /> 播放
+                      </button>
+                      <button className="btn-info" onClick={() => autoSearch(item.title)}>
+                        <Info className="w-5 h-5 mr-2" /> 更多信息
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 搜索框 */}
+      <div className="search-section">
+        <div className="search-box-wrapper">
+          <Search className="search-icon w-6 h-6 text-gray-400 cursor-pointer" onClick={doSearch} />
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+            className="search-input"
+            placeholder="输入片名、剧集、演员..."
+          />
+        </div>
+      </div>
+
+      {/* 榜单区域 */}
+      {!searched && (
+        <>
+          {/* 电影榜 */}
+          {movieList.length > 0 && (
+            <div className="section-container animate__animated animate__fadeInUp">
+              <div className="section-header">
+                <div className="section-line"></div>
+                <div className="section-title">
+                  <Film className="w-5 h-5 opacity-70" /> 全球震感·电影榜
+                </div>
+                <div className="hot-row-nav">
+                  <button className="nav-btn nav-prev" onClick={() => scrollHotRow('movie', 'prev')}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button className="nav-btn nav-next" onClick={() => scrollHotRow('movie', 'next')}>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="hot-row" data-section="movie">
+                {movieList.map((item) => (
+                  <HotCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 剧集榜 */}
+          {tvList.length > 0 && (
+            <div className="section-container animate__animated animate__fadeInUp">
+              <div className="section-header">
+                <div className="section-line"></div>
+                <div className="section-title">
+                  <Tv className="w-5 h-5 opacity-70" /> 全球必追·剧集榜
+                </div>
+                <div className="hot-row-nav">
+                  <button className="nav-btn nav-prev" onClick={() => scrollHotRow('tv', 'prev')}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button className="nav-btn nav-next" onClick={() => scrollHotRow('tv', 'next')}>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="hot-row" data-section="tv">
+                {tvList.map((item) => (
+                  <HotCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 华语强档 */}
+          {listCn.length > 0 && (
+            <div className="section-container animate__animated animate__fadeInUp">
+              <div className="section-header">
+                <div className="section-line"></div>
+                <div className="section-title">
+                  <Globe className="w-5 h-5 opacity-70" /> 华语强档·国产剧
+                </div>
+                <div className="hot-row-nav">
+                  <button className="nav-btn nav-prev" onClick={() => scrollHotRow('cn', 'prev')}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button className="nav-btn nav-next" onClick={() => scrollHotRow('cn', 'next')}>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="hot-row" data-section="cn">
+                {listCn.map((item) => (
+                  <HotCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 日韩潮流 */}
+          {listKrjp.length > 0 && (
+            <div className="section-container animate__animated animate__fadeInUp">
+              <div className="section-header">
+                <div className="section-line"></div>
+                <div className="section-title">
+                  <Sparkles className="w-5 h-5 opacity-70" /> 日韩潮流·剧集/动漫
+                </div>
+                <div className="hot-row-nav">
+                  <button className="nav-btn nav-prev" onClick={() => scrollHotRow('krjp', 'prev')}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button className="nav-btn nav-next" onClick={() => scrollHotRow('krjp', 'next')}>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="hot-row" data-section="krjp">
+                {listKrjp.map((item) => (
+                  <HotCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 搜索结果 */}
+      <div id="search-result-anchor" className="section-container" style={{ display: searched ? 'block' : 'none' }}>
+        <div className="flex justify-between items-center mb-4">
+          <div className="section-header mb-0">
+            <div className="section-line"></div>
+            <div className="section-title">搜索结果</div>
+          </div>
+          <button className="btn btn-sm btn-outline-secondary" onClick={clearSearch}>清除搜索 X</button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-10">
+            <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+          </div>
+        ) : (
+          <div className="result-grid">
+            {groupedList().map((group) => (
+              <ResultCard key={group.name} group={group} />
+            ))}
+          </div>
+        )}
+
+        {!loading && groupedList().length === 0 && (
+          <div className="text-center text-gray-500 py-10">
+            未找到相关内容，请尝试更换关键词
+          </div>
+        )}
+      </div>
+
+      {/* 页脚 */}
+      <div className="footer">
+        <div>机佬TV 改编 爱吃王哥呆阿龟头 原创</div>
+        <div className="text-xs mt-2 opacity-50">Data provided by TMDb & Maccms APIs</div>
+      </div>
+
+      {/* 播放详情页 */}
+      <div className={`detail-overlay fixed inset-0 bg-[#141414] z-50 overflow-y-auto transition-transform duration-300 ${showDetail ? 'active' : 'translate-y-full pointer-events-none'}`}>
+        <div className="close-btn fixed top-6 right-8 z-50" onClick={closeDetail}>
+          <X className="w-6 h-6" />
+        </div>
+
+        {currentGroup && (
+          <div className="player-layout">
+            {/* 视频标题栏 */}
+            <div className="video-header">
+              <div>
+                <h1 className="video-title">{currentGroup.name}</h1>
+                <div className="video-meta">
+                  正在播放: <span className="text-white font-bold">{currentSource?.site_name}</span>
+                </div>
+              </div>
+              <button className="btn-cast">
+                <Tv className="w-4 h-4 mr-2" /> 一键投屏
+              </button>
+            </div>
+
+            {/* 播放器区域 */}
+            <div className="player-box">
+              <div id="dplayer" className="w-full h-full bg-black"></div>
+            </div>
+
+            {/* 控制面板 */}
+            <div className="controls-area">
+              {/* 线路选择 */}
+              <div className="mb-6">
+                <div className="panel-title">切换线路 (真实测速)</div>
+                <div className="source-list">
+                  {currentGroup.sources.map((source) => (
+                    <div
+                      key={source.site_key}
+                      className={`source-pill ${currentSource?.site_key === source.site_key ? 'active' : ''}`}
+                      onClick={() => switchSource(source)}
+                    >
+                      <span>{source.site_name}</span>
+                      <span className={`latency-dot ${getLatencyClass(source.latency || 999)}`}></span>
+                      <span className="text-xs opacity-60">{source.latency}ms</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 选集列表 */}
+              <div>
+                <div className="panel-title">选集播放</div>
+                {loadingDetail ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Loader2 className="w-6 h-6 animate-spin inline-block mr-2" /> 加载中...
+                  </div>
+                ) : (
+                  <div className="ep-grid">
+                    {episodeList.map((ep, index) => (
+                      <div
+                        key={index}
+                        className={`ep-btn ${currentUrl === ep.url ? 'active' : ''}`}
+                        onClick={() => play(ep.url)}
+                      >
+                        {ep.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 加载外部脚本 */}
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js" />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.1.5/hls.min.js" />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/dplayer/1.26.0/DPlayer.min.js" />
+    </div>
+  )
+}
+
+// Script 组件用于加载外部脚本
+function Script({ src }: { src: string }) {
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.src = src
+    script.crossOrigin = 'anonymous'
+    script.referrerPolicy = 'no-referrer'
+    document.body.appendChild(script)
+    
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [src])
+  
+  return null
+}
