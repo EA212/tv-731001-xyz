@@ -79,7 +79,7 @@ app.get("/", (req, res) => {
 });
 
 // 测速接口
-app.get("/api/check", async (req, res) => {
+app.get("/check", async (req, res) => {
   const { key } = req.query;
   console.log(`⚡ [测速] 开始测速 - 站点: ${key}`);
   
@@ -108,7 +108,7 @@ app.get("/api/check", async (req, res) => {
 });
 
 // 热门接口
-app.get("/api/hot", async (req, res) => {
+app.get("/hot", async (req, res) => {
   console.log('🔥 [热门] 开始获取热门内容');
   const sites = SITES.filter(s => ['ffzy', 'bfzy', 'lzi', 'dbzy'].includes(s.key));
   console.log(`📡 [热门] 尝试站点: ${sites.map(s => s.name).join(', ')}`);
@@ -139,7 +139,7 @@ app.get("/api/hot", async (req, res) => {
 });
 
 // 搜索接口
-app.get("/api/search", async (req, res) => {
+app.get("/search", async (req, res) => {
   const { wd } = req.query;
   console.log('\n🔍 ========================================');
   console.log(`🔍 [搜索] 关键词: "${wd}"`);
@@ -209,7 +209,7 @@ app.get("/api/search", async (req, res) => {
 });
 
 // 详情接口
-app.get("/api/detail", async (req, res) => {
+app.get("/detail", async (req, res) => {
   const { site_key, id } = req.query;
   console.log('\n📄 ========================================');
   console.log(`📄 [详情] 站点: ${site_key} - ID: ${id}`);
