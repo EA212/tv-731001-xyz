@@ -26,6 +26,8 @@ export default function RootLayout({
     <html lang="en-US">
       <head>
         <link rel="icon" href="/eo-logo-blue.svg" />
+        <link rel="stylesheet" href="/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="/css/animate.min.css" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

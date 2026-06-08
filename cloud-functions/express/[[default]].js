@@ -3,9 +3,34 @@ import axios from "axios";
 
 const app = express();
 
-// 日志中间件
+// ============================================
+// 详细日志中间件 - 帮助调试API调用
+// ============================================
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+  
+  console.log('\n========================================');
+  console.log(`🚀 [${new Date().toISOString()}] 请求开始`);
+  console.log(`📋 Request ID: ${requestId}`);
+  console.log(`📡 ${req.method} ${req.url}`);
+  console.log(`🔍 Query参数:`, req.query);
+  console.log(`📦 Headers:`, {
+    'user-agent': req.headers['user-agent'],
+    'content-type': req.headers['content-type'],
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'host': req.headers['host']
+  });
+  
+  // 响应完成后记录耗时
+  const originalEnd = res.end;
+  res.end = function(chunk, encoding) {
+    const duration = Date.now() - startTime;
+    console.log(`✅ [${requestId}] 响应完成 - 状态: ${res.statusCode} - 耗时: ${duration}ms`);
+    console.log('========================================\n');
+    return originalEnd.apply(this, arguments);
+  };
+  
   next();
 });
 
@@ -47,102 +72,200 @@ const SITES = [
 
 // 根路由
 app.get("/", (req, res) => {
+  console.log('🏠 [根路由] 返回服务状态');
+  console.log(`📊 当前配置站点数: ${SITES.length}`);
+  console.log('✅ 活跃站点:', SITES.filter(s => s.active).map(s => s.name).join(', '));
   res.json({ message: "机佬TV API 服务运行中", sites: SITES.length });
 });
 
 // 测速接口
 app.get("/api/check", async (req, res) => {
   const { key } = req.query;
+  console.log(`⚡ [测速] 开始测速 - 站点: ${key}`);
+  
   const site = SITES.find(s => s.key === key);
   
   if (!site) {
+    console.log(`❌ [测速] 站点不存在: ${key}`);
     return res.json({ latency: 9999 });
   }
 
+  console.log(`📡 [测速] 请求 URL: ${site.api}?ac=list&pg=1`);
   const start = Date.now();
+  
   try {
-    await axios.get(`${site.api}?ac=list&pg=1`, { timeout: 3000 });
+    const response = await axios.get(`${site.api}?ac=list&pg=1`, { timeout: 3000 });
     const latency = Date.now() - start;
+    console.log(`✅ [测速] ${site.name} 成功 - 延迟: ${latency}ms - 状态: ${response.status}`);
     res.json({ latency });
   } catch (e) {
+    const latency = Date.now() - start;
+    console.log(`❌ [测速] ${site.name} 失败 - 耗时: ${latency}ms`);
+    console.log(`❌ [测速] 错误类型: ${e.code || 'unknown'}`);
+    console.log(`❌ [测速] 错误信息: ${e.message}`);
     res.json({ latency: 9999 });
   }
 });
 
 // 热门接口
 app.get("/api/hot", async (req, res) => {
+  console.log('🔥 [热门] 开始获取热门内容');
   const sites = SITES.filter(s => ['ffzy', 'bfzy', 'lzi', 'dbzy'].includes(s.key));
+  console.log(`📡 [热门] 尝试站点: ${sites.map(s => s.name).join(', ')}`);
   
   for (const site of sites) {
+    console.log(`⏳ [热门] 尝试 ${site.name}...`);
     try {
-      const response = await axios.get(`${site.api}?ac=list&pg=1&h=24&out=json`, { timeout: 3000 });
+      const url = `${site.api}?ac=list&pg=1&h=24&out=json`;
+      console.log(`📡 [热门] URL: ${url}`);
+      
+      const response = await axios.get(url, { timeout: 3000 });
       const list = response.data.list || response.data.data;
+      
       if (list && list.length > 0) {
+        console.log(`✅ [热门] ${site.name} 成功 - 返回 ${list.length} 条数据`);
+        console.log(`📦 [热门] 前3条: ${list.slice(0, 3).map(i => i.vod_name).join(', ')}`);
         return res.json({ list: list.slice(0, 12) });
+      } else {
+        console.log(`⚠️ [热门] ${site.name} 返回空数据`);
       }
     } catch (e) {
+      console.log(`❌ [热门] ${site.name} 失败: ${e.message}`);
       continue;
     }
   }
+  console.log('❌ [热门] 所有站点都失败');
   res.json({ list: [] });
 });
 
 // 搜索接口
 app.get("/api/search", async (req, res) => {
   const { wd } = req.query;
-  console.log(`[Search] ${wd}`);
+  console.log('\n🔍 ========================================');
+  console.log(`🔍 [搜索] 关键词: "${wd}"`);
+  console.log(`🔍 [搜索] 时间: ${new Date().toLocaleTimeString()}`);
   
   if (!wd) {
+    console.log('⚠️ [搜索] 关键词为空，返回空结果');
     return res.json({ list: [] });
   }
   
   const activeSites = SITES.filter(s => s.active);
+  console.log(`📡 [搜索] 活跃站点数: ${activeSites.length}`);
+  console.log(`📡 [搜索] 站点列表: ${activeSites.map(s => s.name).join(', ')}`);
   
   const promises = activeSites.map(async (site) => {
+    console.log(`⏳ [搜索][${site.name}] 开始搜索...`);
+    const startTime = Date.now();
+    
     try {
-      const response = await axios.get(
-        `${site.api}?ac=list&wd=${encodeURIComponent(wd)}&out=json`,
-        { timeout: 6000 }
-      );
+      const url = `${site.api}?ac=list&wd=${encodeURIComponent(wd)}&out=json`;
+      console.log(`📡 [搜索][${site.name}] URL: ${url}`);
+      
+      const response = await axios.get(url, { timeout: 6000 });
       const data = response.data;
       const list = data.list || data.data;
       
+      const duration = Date.now() - startTime;
+      
       if (list && Array.isArray(list)) {
+        console.log(`✅ [搜索][${site.name}] 成功 - 找到 ${list.length} 条 - 耗时 ${duration}ms`);
+        if (list.length > 0) {
+          console.log(`📦 [搜索][${site.name}] 示例: ${list[0].vod_name}`);
+        }
         return list.map(item => ({
           ...item,
           site_key: site.key,
           site_name: site.name,
-          latency: 0
+          latency: duration
         }));
+      } else {
+        console.log(`⚠️ [搜索][${site.name}] 返回数据格式异常`);
       }
     } catch (e) {
-      // 静默失败
+      const duration = Date.now() - startTime;
+      console.log(`❌ [搜索][${site.name}] 失败 - 耗时 ${duration}ms`);
+      console.log(`❌ [搜索][${site.name}] 错误: ${e.code || 'unknown'} - ${e.message}`);
     }
     return [];
   });
   
+  console.log('⏳ [搜索] 等待所有站点响应...');
   const results = await Promise.all(promises);
-  res.json({ list: results.flat() });
+  const flatResults = results.flat();
+  
+  console.log(`\n📊 [搜索] 汇总结果:`);
+  console.log(`📊 [搜索] 总结果数: ${flatResults.length} 条`);
+  
+  // 统计各站点结果
+  const siteStats = {};
+  flatResults.forEach(item => {
+    siteStats[item.site_name] = (siteStats[item.site_name] || 0) + 1;
+  });
+  console.log(`📊 [搜索] 各站点统计:`, siteStats);
+  
+  console.log('🔍 ========================================\n');
+  res.json({ list: flatResults });
 });
 
 // 详情接口
 app.get("/api/detail", async (req, res) => {
   const { site_key, id } = req.query;
+  console.log('\n📄 ========================================');
+  console.log(`📄 [详情] 站点: ${site_key} - ID: ${id}`);
+  
   const targetSite = SITES.find(s => s.key === site_key);
   
   if (!targetSite) {
+    console.log(`❌ [详情] 站点不存在: ${site_key}`);
+    console.log('📄 ========================================\n');
     return res.status(404).json({ error: "Site not found" });
   }
   
+  console.log(`📡 [详情] 站点名称: ${targetSite.name}`);
+  console.log(`📡 [详情] API地址: ${targetSite.api}`);
+  
   try {
-    const response = await axios.get(
-      `${targetSite.api}?ac=detail&ids=${id}&out=json`,
-      { timeout: 6000 }
-    );
+    const url = `${targetSite.api}?ac=detail&ids=${id}&out=json`;
+    console.log(`📡 [详情] 请求 URL: ${url}`);
+    
+    const startTime = Date.now();
+    const response = await axios.get(url, { timeout: 6000 });
+    const duration = Date.now() - startTime;
+    
+    console.log(`✅ [详情] 请求成功 - 状态: ${response.status} - 耗时: ${duration}ms`);
+    
+    const data = response.data;
+    if (data.list && data.list.length > 0) {
+      const item = data.list[0];
+      console.log(`📦 [详情] 视频名称: ${item.vod_name}`);
+      console.log(`📦 [详情] 视频ID: ${item.vod_id}`);
+      console.log(`📦 [详情] 播放地址长度: ${item.vod_play_url?.length || 0} 字符`);
+    }
+    
+    console.log('📄 ========================================\n');
     res.json(response.data);
   } catch (e) {
-    res.status(500).json({ error: "Source Error" });
+    console.log(`❌ [详情] 请求失败`);
+    console.log(`❌ [详情] 错误类型: ${e.code || 'unknown'}`);
+    console.log(`❌ [详情] 错误信息: ${e.message}`);
+    console.log('📄 ========================================\n');
+    res.status(500).json({ error: "Source Error", message: e.message });
   }
 });
+
+// 启动日志
+console.log('\n');
+console.log('╔════════════════════════════════════════╗');
+console.log('║     🚀 机佬TV API 服务已启动          ║');
+console.log('╚════════════════════════════════════════╝');
+console.log(`📊 配置站点数: ${SITES.length}`);
+console.log(`✅ 活跃站点: ${SITES.filter(s => s.active).length}`);
+console.log(`❌ 禁用站点: ${SITES.filter(s => !s.active).length}`);
+console.log('📡 站点列表:');
+SITES.forEach((site, index) => {
+  console.log(`   ${index + 1}. ${site.name} (${site.key}) - ${site.active ? '✅' : '❌'}`);
+});
+console.log('\n');
 
 export default app;

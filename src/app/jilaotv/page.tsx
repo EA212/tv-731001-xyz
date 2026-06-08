@@ -100,13 +100,26 @@ export default function JilaotvPage() {
 
   // 获取所有榜单数据
   const fetchAllLists = useCallback(async () => {
+    console.log('🚀 [开始获取榜单数据]')
+    console.log('📡 TMDb API URL:', TMDB_BASE_URL)
+    
     try {
+      console.log('⏳ 正在请求 4 个榜单...')
+      
       const [movieRes, tvRes, cnRes, krjpRes] = await Promise.all([
         fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
         fetch(`${TMDB_BASE_URL}/trending/tv/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
         fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=CN&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`),
         fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=KR|JP&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`)
       ])
+      
+      console.log('✅ 所有榜单请求完成')
+      console.log('📊 响应状态:', {
+        电影榜: movieRes.status,
+        剧集榜: tvRes.status,
+        华语强档: cnRes.status,
+        日韩潮流: krjpRes.status
+      })
       
       const [movieData, tvData, cnData, krjpData] = await Promise.all([
         movieRes.json(),
@@ -115,21 +128,38 @@ export default function JilaotvPage() {
         krjpRes.json()
       ])
 
+      console.log('📦 数据解析完成:', {
+        电影榜: movieData.results?.length || 0,
+        剧集榜: tvData.results?.length || 0,
+        华语强档: cnData.results?.length || 0,
+        日韩潮流: krjpData.results?.length || 0
+      })
+
       setMovieList(movieData.results || [])
       setTvList(tvData.results || [])
       setListCn(cnData.results || [])
       setListKrjp(krjpData.results || [])
-    } catch {
-      // 静默失败
+      
+      console.log('✨ 榜单数据加载完成')
+    } catch (error) {
+      console.error('❌ 获取榜单数据失败:', error)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 获取 Hero 轮播数据
   const fetchHero = useCallback(async () => {
+    console.log('🎬 [开始获取 Hero 轮播数据]')
+    
     try {
-      const res = await fetch(`${TMDB_BASE_URL}/trending/all/week?api_key=${TMDB_API_KEY}&language=zh-CN`)
+      const url = `${TMDB_BASE_URL}/trending/all/week?api_key=${TMDB_API_KEY}&language=zh-CN`
+      console.log('📡 请求 URL:', url)
+      
+      const res = await fetch(url)
+      console.log('✅ Hero 数据请求完成, 状态:', res.status)
+      
       const data = await res.json()
+      console.log('📦 Hero 数据:', data.results?.length || 0, '条')
       
       if (data.results) {
         const heroes = data.results
@@ -140,16 +170,21 @@ export default function JilaotvPage() {
             overview: item.overview || '精彩内容不容错过',
             backdrop: `${TMDB_BACKDROP_URL}${item.backdrop_path}`
           }))
+        
+        console.log('🖼️ Hero 轮播图片:', heroes.map((h: { title: string }) => h.title))
         setHeroList(heroes)
       }
-    } catch {
-      // 静默失败
+      
+      console.log('✨ Hero 数据加载完成')
+    } catch (error) {
+      console.error('❌ 获取 Hero 数据失败:', error)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 初始化数据
   useEffect(() => {
+    console.log('🚀 [页面初始化] 开始加载数据...')
     fetchAllLists()
     fetchHero()
   }, [fetchAllLists, fetchHero])
@@ -223,24 +258,87 @@ export default function JilaotvPage() {
 
   // 搜索功能
   const doSearch = async () => {
-    if (!keyword.trim()) return
+    if (!keyword.trim()) {
+      console.warn('⚠️ 搜索关键词为空，已取消搜索')
+      return
+    }
+    
+    console.log('========================================')
+    console.log('🔍 [开始搜索]')
+    console.log('📝 关键词:', keyword.trim())
+    console.log('⏰ 时间:', new Date().toLocaleTimeString())
     
     setLoading(true)
     setSearched(true)
     setRawList([])
     
     try {
-      const res = await fetch(`/api/search?wd=${encodeURIComponent(keyword.trim())}`)
+      const url = `/api/search?wd=${encodeURIComponent(keyword.trim())}`
+      console.log('📡 请求 URL:', url)
+      console.log('⏳ 正在发送请求...')
+      
+      const startTime = Date.now()
+      const res = await fetch(url)
+      const endTime = Date.now()
+      
+      console.log('✅ 请求完成')
+      console.log('📊 HTTP 状态:', res.status, res.statusText)
+      console.log('⏱️ 耗时:', endTime - startTime, 'ms')
+      
+      if (!res.ok) {
+        console.error('❌ HTTP 错误:', res.status, res.statusText)
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      }
+      
+      console.log('⏳ 正在解析 JSON...')
       const data = await res.json()
+      
+      console.log('📦 解析完成')
+      console.log('📊 结果数量:', data.list?.length || 0, '条')
+      
+      if (data.list && data.list.length > 0) {
+        console.log('✅ 搜索成功！找到', data.list.length, '条结果')
+        console.log('📝 前 3 条结果预览:')
+        data.list.slice(0, 3).forEach((item: SearchResult, index: number) => {
+          console.log(`  ${index + 1}. ${item.vod_name} - ${item.site_name}`)
+        })
+        
+        // 统计各站点结果数
+        const siteCount: Record<string, number> = {}
+        data.list.forEach((item: SearchResult) => {
+          siteCount[item.site_name] = (siteCount[item.site_name] || 0) + 1
+        })
+        console.log('📊 各站点结果统计:', siteCount)
+      } else {
+        console.warn('⚠️ 未找到任何结果')
+      }
+      
       setRawList(data.list || [])
+      
+      // 处理图片 fallback
+      const needFallback = data.list?.filter((item: SearchResult) => 
+        !item.vod_pic || item.vod_pic.includes('mac_default')
+      ) || []
+      
+      if (needFallback.length > 0) {
+        console.log('🖼️ 需要图片 Fallback:', needFallback.length, '条')
+      }
       
       data.list?.forEach((item: SearchResult) => {
         if (!item.vod_pic || item.vod_pic.includes('mac_default')) {
           handleImgError(item.vod_name)
         }
       })
+      
+      console.log('✨ 搜索流程全部完成')
+      console.log('========================================')
     } catch (error) {
-      console.error('Search failed:', error)
+      console.error('========================================')
+      console.error('❌ [搜索失败]')
+      console.error('❌ 错误类型:', error instanceof Error ? error.name : typeof error)
+      console.error('❌ 错误信息:', error instanceof Error ? error.message : error)
+      console.error('❌ 完整错误:', error)
+      console.error('========================================')
     } finally {
       setLoading(false)
     }
@@ -249,6 +347,8 @@ export default function JilaotvPage() {
   // 图片错误处理
   const handleImgError = async (name: string) => {
     if (imageMap[name] || fallbackMap[name]) return
+    
+    console.log('🖼️ [图片 Fallback]', name)
     setFallbackMap(prev => ({ ...prev, [name]: true }))
     
     const cleanName = name.replace(/第[0-9一二三四五六七八九十]+[季部]/g, '')
@@ -257,19 +357,27 @@ export default function JilaotvPage() {
       .replace(/(HD|BD|1080P|720P|4K|202\d|TC|TS).*/i, '')
       .trim()
     
+    console.log('🔍 清理后的名称:', cleanName)
+    
     try {
-      const res = await fetch(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&language=zh-CN`)
+      const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&language=zh-CN`
+      const res = await fetch(url)
       const data = await res.json()
       
       if (data.results && data.results.length > 0) {
         const found = data.results.find((i: MovieItem) => i.poster_path) || data.results[0]
         if (found.poster_path) {
+          console.log('✅ 找到图片:', found.title || found.name)
           setImageMap(prev => ({ ...prev, [name]: `${TMDB_IMG_URL}${found.poster_path}` }))
           setFallbackMap(prev => ({ ...prev, [name]: false }))
+        } else {
+          console.warn('⚠️ 未找到图片')
         }
+      } else {
+        console.warn('⚠️ TMDb 未找到结果')
       }
     } catch (error) {
-      console.error('Image fallback failed:', error)
+      console.error('❌ 图片 Fallback 失败:', error)
     }
   }
 
@@ -331,14 +439,17 @@ export default function JilaotvPage() {
 
   // 打开详情页
   const openDetail = (group: Group) => {
+    console.log('🎬 [打开详情]', group.name, '共', group.sources.length, '个源')
     setCurrentGroup(group)
     setShowDetail(true)
     
+    console.log('⏳ 开始测速...')
     group.sources.forEach(source => {
       source.latency = '...'
       fetch(`/api/check?key=${source.site_key}`)
         .then(res => res.json())
         .then(data => {
+          console.log(`✅ ${source.site_name} 延迟:`, data.latency, 'ms')
           setCurrentGroup(prev => {
             if (!prev) return prev
             return {
@@ -349,9 +460,13 @@ export default function JilaotvPage() {
             }
           })
         })
+        .catch(error => {
+          console.error(`❌ ${source.site_name} 测速失败:`, error)
+        })
     })
     
     const best = group.sources[0]
+    console.log('🎯 选择最佳源:', best.site_name)
     switchSource(best)
   }
 
@@ -362,19 +477,28 @@ export default function JilaotvPage() {
 
   // 切换线路
   const switchSource = async (source: Source) => {
+    console.log('🔄 [切换线路]', source.site_name)
     setCurrentSource(source)
     setLoadingDetail(true)
     setEpisodeList([])
     
     try {
-      const res = await fetch(`/api/detail?site_key=${source.site_key}&id=${source.vod_id}`)
+      const url = `/api/detail?site_key=${source.site_key}&id=${source.vod_id}`
+      console.log('📡 详情 URL:', url)
+      
+      const res = await fetch(url)
+      console.log('✅ 详情请求完成, 状态:', res.status)
+      
       const data = await res.json()
       
       if (data.list && data.list.length > 0) {
+        console.log('📦 获取到剧集数据')
         parseEpisodes(data.list[0].vod_play_url)
+      } else {
+        console.warn('⚠️ 未找到剧集数据')
       }
-    } catch (e) {
-      console.error('Failed to fetch detail:', e)
+    } catch (error) {
+      console.error('❌ 获取详情失败:', error)
     } finally {
       setLoadingDetail(false)
     }
@@ -744,9 +868,9 @@ export default function JilaotvPage() {
       </div>
 
       {/* 加载外部脚本 */}
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js" />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.1.5/hls.min.js" />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/dplayer/1.26.0/DPlayer.min.js" />
+      <Script src="/js/bootstrap.bundle.min.js" />
+      <Script src="/js/hls.min.js" />
+      <Script src="/js/DPlayer.min.js" />
     </div>
   )
 }
