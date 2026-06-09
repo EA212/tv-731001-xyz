@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2 } from 'lucide-react'
+import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2, Sun, Moon } from 'lucide-react'
 
 // 类型定义
 interface MovieItem {
@@ -57,6 +57,11 @@ interface DPlayerConstructor {
   }): DPlayerInstance
 }
 
+// WebKit 扩展的视频元素接口
+interface WebKitHTMLVideoElement extends HTMLVideoElement {
+  webkitShowPlaybackTargetPicker?: () => void
+}
+
 declare global {
   interface Window {
     DPlayer?: DPlayerConstructor
@@ -83,6 +88,7 @@ export default function JilaotvPage() {
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [imageMap, setImageMap] = useState<Record<string, string>>({})
   const [fallbackMap, setFallbackMap] = useState<Record<string, boolean>>({})
+  const [isDark, setIsDark] = useState(true) // 黑暗模式状态
   const dplayerRef = useRef<{ destroy: () => void } | null>(null)
 
   const TMDB_API_KEY = 'c36cafd8b15f8b30f416867cfef1b01d'
@@ -91,12 +97,67 @@ export default function JilaotvPage() {
   const TMDB_IMG_URL = `${MY_PROXY}/t/p/w500`
   const TMDB_BACKDROP_URL = `${MY_PROXY}/t/p/original`
 
+  // 切换主题
+  const toggleTheme = () => {
+    setIsDark(!isDark)
+    document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark')
+  }
+
+  // 初始化主题
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 滚动事件监听
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // 初始化触摸滑动支持（仅移动端）
+  useEffect(() => {
+    const initHotRowSwipe = () => {
+      const hotRows = document.querySelectorAll('.hot-row')
+      
+      hotRows.forEach(row => {
+        let isDown = false
+        let startX: number
+        let scrollLeft: number
+        
+        // 触摸事件（仅移动端需要）
+        const handleTouchStart = (e: Event) => {
+          const touchEvent = e as TouchEvent
+          isDown = true
+          startX = touchEvent.touches[0].pageX - (row as HTMLElement).offsetLeft
+          scrollLeft = (row as HTMLElement).scrollLeft
+        }
+        
+        const handleTouchMove = (e: Event) => {
+          if (!isDown) return
+          const touchEvent = e as TouchEvent
+          touchEvent.preventDefault()
+          const x = touchEvent.touches[0].pageX - (row as HTMLElement).offsetLeft
+          const walk = (x - startX) * 2
+          ;(row as HTMLElement).scrollLeft = scrollLeft - walk
+        }
+        
+        const handleTouchEnd = () => {
+          isDown = false
+        }
+        
+        // 只添加触摸事件，不添加鼠标事件
+        row.addEventListener('touchstart', handleTouchStart, { passive: false })
+        row.addEventListener('touchmove', handleTouchMove, { passive: false })
+        row.addEventListener('touchend', handleTouchEnd)
+      })
+    }
+    
+    // 延迟初始化，等待 DOM 渲染
+    const timer = setTimeout(initHotRowSwipe, 100)
+    return () => clearTimeout(timer)
+  }, [movieList, tvList, listCn, listKrjp])
 
   // 获取所有榜单数据
   const fetchAllLists = useCallback(async () => {
@@ -257,15 +318,16 @@ export default function JilaotvPage() {
   }, [currentUrl, showDetail])
 
   // 搜索功能
-  const doSearch = async () => {
-    if (!keyword.trim()) {
+  const doSearch = async (searchKeyword?: string) => {
+    const kw = searchKeyword || keyword.trim()
+    if (!kw) {
       console.warn('⚠️ 搜索关键词为空，已取消搜索')
       return
     }
     
     console.log('========================================')
     console.log('🔍 [开始搜索]')
-    console.log('📝 关键词:', keyword.trim())
+    console.log('📝 关键词:', kw)
     console.log('⏰ 时间:', new Date().toLocaleTimeString())
     
     setLoading(true)
@@ -273,7 +335,7 @@ export default function JilaotvPage() {
     setRawList([])
     
     try {
-      const url = `/api/search?wd=${encodeURIComponent(keyword.trim())}`
+      const url = `/api/search?wd=${encodeURIComponent(kw)}`
       console.log('📡 请求 URL:', url)
       console.log('⏳ 正在发送请求...')
       
@@ -384,7 +446,7 @@ export default function JilaotvPage() {
   // 自动搜索
   const autoSearch = (name: string) => {
     setKeyword(name)
-    doSearch()
+    doSearch(name)  // 直接传递 name，不依赖状态更新
     
     setTimeout(() => {
       const anchor = document.getElementById('search-result-anchor')
@@ -535,6 +597,27 @@ export default function JilaotvPage() {
     return numMs < 500 ? 'dot-green' : (numMs < 2000 ? 'dot-yellow' : 'dot-red')
   }
 
+  // 投屏功能
+  const castVideo = () => {
+    const videoEl = document.querySelector('.dplayer-video') as WebKitHTMLVideoElement
+    if (!videoEl) {
+      alert('请先播放视频')
+      return
+    }
+    
+    // 尝试使用 Presentation API
+    if (videoEl.remote && videoEl.remote.state !== 'disconnected') {
+      videoEl.remote.prompt().catch(() => {})
+    } 
+    // 尝试使用 WebKit 投屏 API (iOS Safari)
+    else if (videoEl.webkitShowPlaybackTargetPicker) {
+      videoEl.webkitShowPlaybackTargetPicker()
+    } 
+    else {
+      alert('您的浏览器不支持网页直接投屏，请使用浏览器菜单中的投射功能。')
+    }
+  }
+
   // 滚动热榜
   const scrollHotRow = (section: string, direction: 'prev' | 'next') => {
     const hotRow = document.querySelector(`[data-section="${section}"]`) as HTMLElement
@@ -606,17 +689,31 @@ export default function JilaotvPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className={`min-h-screen ${isDark ? 'bg-[#141414]' : 'bg-[#f5f5f5]'} ${isDark ? 'text-white' : 'text-[#141414]'}`}>
       {/* 导航栏 */}
       <nav className={`navbar-custom fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 50 ? 'scrolled' : ''}`}>
-        <div className="brand">机佬TV <span className="text-xs text-gray-500 font-normal">MAX</span></div>
+        <div className="brand flex items-center">
+          <img src="/logo.png" alt="机佬TV" className="h-[50px] md:h-[60px] mr-2" />
+          <span className="text-xs text-gray-500 font-normal">MAX</span>
+        </div>
+        <button 
+          className="theme-toggle" 
+          onClick={toggleTheme} 
+          title="切换主题"
+        >
+          {isDark ? (
+            <Sun className="w-5 h-5" />
+          ) : (
+            <Moon className="w-5 h-5" />
+          )}
+        </button>
       </nav>
 
       {/* Hero 轮播 */}
-      {heroList.length > 0 && (
-        <div id="heroCarousel" className="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="6000">
-          <div className="carousel-inner">
-            {heroList.map((item, index) => (
+      <div id="heroCarousel" className="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="6000">
+        <div className="carousel-inner">
+          {heroList.length > 0 ? (
+            heroList.map((item, index) => (
               <div key={index} className={`carousel-item ${index === 0 ? 'active' : ''}`}>
                 <div className="hero-bg" style={{ backgroundImage: `url(${item.backdrop})` }}></div>
                 <div className="hero-overlay">
@@ -635,15 +732,31 @@ export default function JilaotvPage() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            ))
+          ) : (
+            /* Hero 骨架屏 */
+            <div className="carousel-item active">
+              <div className="skeleton-hero">
+                <div className="skeleton-hero-content">
+                  <div className="skeleton-hero-tag"></div>
+                  <div className="skeleton-hero-title"></div>
+                  <div className="skeleton-hero-desc"></div>
+                  <div className="skeleton-hero-desc" style={{ width: '70%' }}></div>
+                  <div style={{ marginTop: '20px' }}>
+                    <div className="skeleton-hero-btn"></div>
+                    <div className="skeleton-hero-btn"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* 搜索框 */}
       <div className="search-section">
         <div className="search-box-wrapper">
-          <Search className="search-icon w-6 h-6 text-gray-400 cursor-pointer" onClick={doSearch} />
+          <Search className="search-icon w-6 h-6 text-gray-400 cursor-pointer" onClick={() => doSearch()} />
           <input
             type="text"
             value={keyword}
@@ -659,13 +772,13 @@ export default function JilaotvPage() {
       {!searched && (
         <>
           {/* 电影榜 */}
-          {movieList.length > 0 && (
-            <div className="section-container animate__animated animate__fadeInUp">
-              <div className="section-header">
-                <div className="section-line"></div>
-                <div className="section-title">
-                  <Film className="w-5 h-5 opacity-70" /> 全球震感·电影榜
-                </div>
+          <div className="section-container animate__animated animate__fadeInUp">
+            <div className="section-header">
+              <div className="section-line"></div>
+              <div className="section-title">
+                <Film className="w-5 h-5 opacity-70" /> 全球震感·电影榜
+              </div>
+              {movieList.length > 0 && (
                 <div className="hot-row-nav">
                   <button className="nav-btn nav-prev" onClick={() => scrollHotRow('movie', 'prev')}>
                     <ChevronLeft className="w-4 h-4" />
@@ -674,23 +787,32 @@ export default function JilaotvPage() {
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div className="hot-row" data-section="movie">
-                {movieList.map((item) => (
-                  <HotCard key={item.id} item={item} />
-                ))}
-              </div>
+              )}
             </div>
-          )}
+            <div className="hot-row" data-section="movie">
+              {movieList.length > 0 ? (
+                movieList.map((item) => <HotCard key={item.id} item={item} />)
+              ) : (
+                /* 骨架屏 */
+                Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-poster"></div>
+                    <div className="skeleton-text"></div>
+                    <div className="skeleton-text-sm"></div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
           {/* 剧集榜 */}
-          {tvList.length > 0 && (
-            <div className="section-container animate__animated animate__fadeInUp">
-              <div className="section-header">
-                <div className="section-line"></div>
-                <div className="section-title">
-                  <Tv className="w-5 h-5 opacity-70" /> 全球必追·剧集榜
-                </div>
+          <div className="section-container animate__animated animate__fadeInUp">
+            <div className="section-header">
+              <div className="section-line"></div>
+              <div className="section-title">
+                <Tv className="w-5 h-5 opacity-70" /> 全球必追·剧集榜
+              </div>
+              {tvList.length > 0 && (
                 <div className="hot-row-nav">
                   <button className="nav-btn nav-prev" onClick={() => scrollHotRow('tv', 'prev')}>
                     <ChevronLeft className="w-4 h-4" />
@@ -699,23 +821,31 @@ export default function JilaotvPage() {
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div className="hot-row" data-section="tv">
-                {tvList.map((item) => (
-                  <HotCard key={item.id} item={item} />
-                ))}
-              </div>
+              )}
             </div>
-          )}
+            <div className="hot-row" data-section="tv">
+              {tvList.length > 0 ? (
+                tvList.map((item) => <HotCard key={item.id} item={item} />)
+              ) : (
+                Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-poster"></div>
+                    <div className="skeleton-text"></div>
+                    <div className="skeleton-text-sm"></div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
           {/* 华语强档 */}
-          {listCn.length > 0 && (
-            <div className="section-container animate__animated animate__fadeInUp">
-              <div className="section-header">
-                <div className="section-line"></div>
-                <div className="section-title">
-                  <Globe className="w-5 h-5 opacity-70" /> 华语强档·国产剧
-                </div>
+          <div className="section-container animate__animated animate__fadeInUp">
+            <div className="section-header">
+              <div className="section-line"></div>
+              <div className="section-title">
+                <Globe className="w-5 h-5 opacity-70" /> 华语强档·国产剧
+              </div>
+              {listCn.length > 0 && (
                 <div className="hot-row-nav">
                   <button className="nav-btn nav-prev" onClick={() => scrollHotRow('cn', 'prev')}>
                     <ChevronLeft className="w-4 h-4" />
@@ -724,23 +854,31 @@ export default function JilaotvPage() {
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div className="hot-row" data-section="cn">
-                {listCn.map((item) => (
-                  <HotCard key={item.id} item={item} />
-                ))}
-              </div>
+              )}
             </div>
-          )}
+            <div className="hot-row" data-section="cn">
+              {listCn.length > 0 ? (
+                listCn.map((item) => <HotCard key={item.id} item={item} />)
+              ) : (
+                Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-poster"></div>
+                    <div className="skeleton-text"></div>
+                    <div className="skeleton-text-sm"></div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
           {/* 日韩潮流 */}
-          {listKrjp.length > 0 && (
-            <div className="section-container animate__animated animate__fadeInUp">
-              <div className="section-header">
-                <div className="section-line"></div>
-                <div className="section-title">
-                  <Sparkles className="w-5 h-5 opacity-70" /> 日韩潮流·剧集/动漫
-                </div>
+          <div className="section-container animate__animated animate__fadeInUp">
+            <div className="section-header">
+              <div className="section-line"></div>
+              <div className="section-title">
+                <Sparkles className="w-5 h-5 opacity-70" /> 日韩潮流·剧集/动漫
+              </div>
+              {listKrjp.length > 0 && (
                 <div className="hot-row-nav">
                   <button className="nav-btn nav-prev" onClick={() => scrollHotRow('krjp', 'prev')}>
                     <ChevronLeft className="w-4 h-4" />
@@ -749,14 +887,22 @@ export default function JilaotvPage() {
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div className="hot-row" data-section="krjp">
-                {listKrjp.map((item) => (
-                  <HotCard key={item.id} item={item} />
-                ))}
-              </div>
+              )}
             </div>
-          )}
+            <div className="hot-row" data-section="krjp">
+              {listKrjp.length > 0 ? (
+                listKrjp.map((item) => <HotCard key={item.id} item={item} />)
+              ) : (
+                Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="skeleton-card">
+                    <div className="skeleton-poster"></div>
+                    <div className="skeleton-text"></div>
+                    <div className="skeleton-text-sm"></div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </>
       )}
 
@@ -796,7 +942,7 @@ export default function JilaotvPage() {
       </div>
 
       {/* 播放详情页 */}
-      <div className={`detail-overlay fixed inset-0 bg-[#141414] z-50 overflow-y-auto transition-transform duration-300 ${showDetail ? 'active' : 'translate-y-full pointer-events-none'}`}>
+      <div className={`detail-overlay ${showDetail ? 'active' : ''}`}>
         <div className="close-btn fixed top-6 right-8 z-50" onClick={closeDetail}>
           <X className="w-6 h-6" />
         </div>
@@ -811,7 +957,7 @@ export default function JilaotvPage() {
                   正在播放: <span className="text-white font-bold">{currentSource?.site_name}</span>
                 </div>
               </div>
-              <button className="btn-cast">
+              <button className="btn-cast" onClick={castVideo}>
                 <Tv className="w-4 h-4 mr-2" /> 一键投屏
               </button>
             </div>

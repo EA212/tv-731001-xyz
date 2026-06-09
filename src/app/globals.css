@@ -109,9 +109,25 @@ body {
 }
 
 /* Hero */
+.carousel {
+  position: relative;
+}
+
+.carousel-inner {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
 .carousel-item {
+  position: relative;
   height: 70vh;
   background-color: #000;
+  display: none;
+}
+
+.carousel-item.active {
+  display: block;
 }
 
 .hero-bg {
@@ -337,19 +353,12 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  cursor: grab;
-  user-select: none;
   padding: 0 20px 20px;
   margin: 0 -20px;
 }
 
 .hot-row::-webkit-scrollbar {
   height: 0px;
-}
-
-.hot-row:active {
-  cursor: grabbing;
-  scroll-snap-type: none;
 }
 
 .hot-card {
@@ -397,6 +406,20 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid rgba(70, 211, 105, 0.3);
+}
+
+.rank-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-weight: 900;
+  font-size: 24px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .poster-fallback {
@@ -455,10 +478,14 @@ body {
   background: #141414;
   z-index: 9999;
   overflow-y: auto;
+  transform: translateY(100%);
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .detail-overlay.active {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 @keyframes slideUp {
@@ -694,4 +721,651 @@ body {
     min-width: 120px;
     width: 120px;
   }
+}
+
+/* ====== 主题切换 ====== */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  color: #888;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* 亮色主题 */
+[data-theme="light"] {
+  --bg-color: #f5f5f5;
+  --panel-bg: #ffffff;
+  --text-main: #141414;
+  --text-sub: #666666;
+  --border: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .navbar-custom {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, transparent 100%);
+}
+
+[data-theme="light"] .navbar-custom.scrolled {
+  background: #f5f5f5;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #141414;
+}
+
+[data-theme="light"] .hero-overlay {
+  background: linear-gradient(to top, #f5f5f5 0%, transparent 60%), linear-gradient(to right, rgba(255, 255, 255, 0.8) 0%, transparent 50%);
+}
+
+[data-theme="light"] .search-box-wrapper {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .search-input {
+  color: #141414;
+}
+
+[data-theme="light"] .search-input::placeholder {
+  color: #999;
+}
+
+[data-theme="light"] .poster-wrap {
+  background: #eee;
+}
+
+[data-theme="light"] .detail-overlay {
+  background: #f5f5f5;
+}
+
+[data-theme="light"] .controls-area {
+  background: #ffffff;
+}
+
+[data-theme="light"] .source-pill {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #333;
+}
+
+[data-theme="light"] .source-pill:hover {
+  background: #e0e0e0;
+}
+
+[data-theme="light"] .ep-btn {
+  background: #f0f0f0;
+  color: #333;
+}
+
+[data-theme="light"] .ep-btn:hover {
+  background: #e0e0e0;
+}
+
+[data-theme="light"] .ep-btn.active {
+  background: #141414;
+  color: #fff;
+}
+
+[data-theme="light"] .section-title {
+  color: #141414;
+}
+
+[data-theme="light"] .movie-name {
+  color: #222;
+}
+
+[data-theme="light"] .movie-date {
+  color: #888;
+}
+
+[data-theme="light"] .hero-title {
+  text-shadow: 2px 2px 10px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="light"] .rank-badge {
+  background: rgba(255, 255, 255, 0.9);
+  text-shadow: none;
+}
+
+[data-theme="light"] .hero-desc {
+  color: #333;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="light"] .hero-tag {
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+[data-theme="light"] .btn-play {
+  background: #141414;
+  color: #fff;
+}
+
+[data-theme="light"] .btn-info {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+[data-theme="light"] .btn-info:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .video-title {
+  color: #141414;
+}
+
+[data-theme="light"] .video-meta {
+  color: #666;
+}
+
+[data-theme="light"] .close-btn {
+  background: rgba(0, 0, 0, 0.1);
+  color: #141414;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .close-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .nav-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .nav-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #ccc;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+[data-theme="light"] .poster-fallback {
+  background: linear-gradient(135deg, #ddd 0%, #bbb 100%);
+}
+
+[data-theme="light"] .poster-fallback i {
+  color: #666;
+}
+
+/* ====== 骨架屏加载动画 ====== */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-card {
+  min-width: 150px;
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.skeleton-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-top: 10px;
+  background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-text-sm {
+  height: 12px;
+  width: 60%;
+  margin: 4px auto 0;
+  background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-hero {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #0a0a0a 0px, #1a1a1a 40px, #0a0a0a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 2s ease-in-out infinite;
+}
+
+.skeleton-hero-content {
+  position: absolute;
+  bottom: 30%;
+  left: 5%;
+  width: 400px;
+}
+
+.skeleton-hero-tag {
+  width: 100px;
+  height: 24px;
+  background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.skeleton-hero-title {
+  width: 80%;
+  height: 50px;
+  background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.skeleton-hero-desc {
+  width: 100%;
+  height: 20px;
+  background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.skeleton-hero-btn {
+  width: 120px;
+  height: 44px;
+  background: linear-gradient(90deg, #3a3a3a 0px, #4a4a4a 40px, #3a3a3a 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  display: inline-block;
+  margin-right: 15px;
+}
+
+/* 亮色主题骨架屏 */
+[data-theme="light"] .skeleton,
+[data-theme="light"] .skeleton-poster,
+[data-theme="light"] .skeleton-text,
+[data-theme="light"] .skeleton-text-sm {
+  background: linear-gradient(90deg, #e0e0e0 0px, #f0f0f0 40px, #e0e0e0 80px);
+  background-size: 200px 100%;
+}
+
+@media (max-width: 768px) {
+  .skeleton-hero-content {
+    width: 280px;
+  }
+  
+  .skeleton-hero-title {
+    height: 36px;
+  }
+}
+
+/* ====== 移动端深度优化 ====== */
+@media (max-width: 768px) {
+  /* 导航栏优化 */
+  .navbar-custom {
+    padding: 12px 3%;
+  }
+  
+  .navbar-custom .brand {
+    font-size: 20px;
+  }
+  
+  /* Hero 区域优化 */
+  .hero-content {
+    margin-top: 30px;
+    padding: 0 10px;
+  }
+  
+  .hero-overlay {
+    padding-left: 3%;
+  }
+  
+  /* 搜索框优化 */
+  .search-section {
+    margin-top: -25px;
+    padding: 0 3%;
+  }
+  
+  .search-input {
+    height: 50px;
+    font-size: 16px;
+  }
+  
+  .search-icon {
+    padding: 0 15px;
+  }
+  
+  /* 列表区域优化 */
+  .section-container {
+    padding: 0 3%;
+    margin-bottom: 30px;
+  }
+  
+  .section-title {
+    font-size: 1.1rem;
+  }
+  
+  /* 热榜卡片优化 */
+  .hot-card {
+    min-width: 110px;
+    width: 110px;
+  }
+  
+  .hot-row {
+    padding: 0 10px 15px;
+    margin: 0 -10px;
+    gap: 10px;
+  }
+  
+  .movie-name {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  
+  .movie-date {
+    font-size: 10px;
+  }
+  
+  /* 搜索结果网格优化 */
+  .result-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 15px;
+  }
+  
+  /* 播放详情页优化 */
+  .detail-overlay {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .player-layout {
+    padding: 70px 3% 30px;
+  }
+  
+  .video-header {
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .video-title {
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+  
+  .video-meta {
+    font-size: 12px;
+  }
+  
+  /* 投屏按钮优化 */
+  .btn-cast {
+    padding: 8px 16px;
+    font-size: 12px;
+    align-self: flex-start;
+  }
+  
+  /* 播放器区域优化 */
+  .player-box {
+    aspect-ratio: 16/9;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  /* 控制面板优化 */
+  .controls-area {
+    padding: 20px 15px;
+    border-radius: 8px;
+  }
+  
+  .panel-title {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  
+  /* 线路选择优化 */
+  .source-list {
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .source-pill {
+    padding: 6px 12px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  
+  /* 选集按钮优化 */
+  .ep-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 8px;
+  }
+  
+  .ep-btn {
+    padding: 10px 4px;
+    font-size: 12px;
+    border-radius: 4px;
+  }
+  
+  /* 关闭按钮优化 */
+  .close-btn {
+    top: 15px;
+    right: 15px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  /* 页脚优化 */
+  .footer {
+    margin-top: 50px;
+    padding: 0 3% 15px;
+  }
+}
+
+/* ====== 超小屏幕优化 (< 375px) ====== */
+@media (max-width: 375px) {
+  .hot-card {
+    min-width: 100px;
+    width: 100px;
+  }
+  
+  .result-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+  
+  .video-title {
+    font-size: 1.2rem;
+  }
+  
+  .ep-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 6px;
+  }
+  
+  .ep-btn {
+    padding: 8px 3px;
+    font-size: 11px;
+  }
+}
+
+/* ====== 横屏模式优化 ====== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .carousel-item {
+    height: 100vh;
+  }
+  
+  .player-box {
+    aspect-ratio: 16/9;
+    max-height: 70vh;
+  }
+  
+  .player-layout {
+    padding-top: 60px;
+  }
+}
+
+/* ====== 触摸设备优化 ====== */
+@media (hover: none) and (pointer: coarse) {
+  /* 增大触摸目标 */
+  .hot-card {
+    min-width: 115px;
+    width: 115px;
+  }
+  
+  .ep-btn {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .source-pill {
+    min-height: 44px;
+  }
+  
+  .nav-btn {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .close-btn {
+    width: 48px;
+    height: 48px;
+  }
+  
+  /* 禁用 hover 效果避免粘滞 */
+  .hot-card:hover {
+    transform: none;
+  }
+  
+  .result-card:hover {
+    transform: none;
+  }
+  
+  /* 添加按下反馈 */
+  .hot-card:active {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  
+  .ep-btn:active {
+    transform: scale(0.95);
+  }
+  
+  .source-pill:active {
+    transform: scale(0.95);
+  }
+}
+
+/* ====== iPhone X 等刘海屏适配 ====== */
+@supports (padding: max(0px)) {
+  .navbar-custom {
+    padding-left: max(4%, env(safe-area-inset-left));
+    padding-right: max(4%, env(safe-area-inset-right));
+  }
+  
+  .detail-overlay {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .close-btn {
+    right: max(30px, env(safe-area-inset-right));
+  }
+  
+  .footer {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ====== 搜索结果清除按钮样式 ====== */
+.btn-outline-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #888;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] .btn-outline-secondary {
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #666;
+}
+
+[data-theme="light"] .btn-outline-secondary:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #141414;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ====== 滚动容器优化 ====== */
+.hot-row.grabbing {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+
+/* ====== 防止文本选择 ====== */
+.hot-row,
+.source-list,
+.ep-grid {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* ====== 优化滚动性能 ====== */
+.hot-row,
+.detail-overlay {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
