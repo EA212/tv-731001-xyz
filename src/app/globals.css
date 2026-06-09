@@ -341,11 +341,11 @@ body {
   transform: none;
 }
 
-/* 热榜滚动区域 */
+/* 热榜滚动区域 - 基础样式（适用于所有设备） */
 .hot-row {
   display: flex;
   gap: 14px;
-  overflow-x: auto;
+  overflow-x: hidden;        /* 默认隐藏水平滚动，不劫持鼠标滚轮 */
   overflow-y: hidden;
   padding-bottom: 20px;
   scroll-behavior: smooth;
@@ -353,8 +353,26 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  cursor: default;           /* 非触摸设备不用抓取光标 */
+  user-select: none;
   padding: 0 20px 20px;
   margin: 0 -20px;
+  touch-action: pan-y pinch-zoom;  /* 允许触摸垂直滚动 */
+  overscroll-behavior: contain;    /* 防止滚动链，避免滚动穿透 */
+}
+
+/* 触摸设备专用：恢复水平滚动和抓取光标 */
+@media (hover: none) and (pointer: coarse) {
+  .hot-row {
+    overflow-x: auto;        /* 只在触摸设备上启用水平滚动 */
+    cursor: grab;
+    touch-action: pan-x pan-y; /* 触摸设备允许水平和垂直滚动 */
+  }
+
+  .hot-row:active {
+    cursor: grabbing;
+    scroll-snap-type: none;
+  }
 }
 
 .hot-row::-webkit-scrollbar {

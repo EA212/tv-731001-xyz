@@ -116,48 +116,12 @@ export default function JilaotvPage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // 初始化触摸滑动支持（仅移动端）
-  useEffect(() => {
-    const initHotRowSwipe = () => {
-      const hotRows = document.querySelectorAll('.hot-row')
-      
-      hotRows.forEach(row => {
-        let isDown = false
-        let startX: number
-        let scrollLeft: number
-        
-        // 触摸事件（仅移动端需要）
-        const handleTouchStart = (e: Event) => {
-          const touchEvent = e as TouchEvent
-          isDown = true
-          startX = touchEvent.touches[0].pageX - (row as HTMLElement).offsetLeft
-          scrollLeft = (row as HTMLElement).scrollLeft
-        }
-        
-        const handleTouchMove = (e: Event) => {
-          if (!isDown) return
-          const touchEvent = e as TouchEvent
-          touchEvent.preventDefault()
-          const x = touchEvent.touches[0].pageX - (row as HTMLElement).offsetLeft
-          const walk = (x - startX) * 2
-          ;(row as HTMLElement).scrollLeft = scrollLeft - walk
-        }
-        
-        const handleTouchEnd = () => {
-          isDown = false
-        }
-        
-        // 只添加触摸事件，不添加鼠标事件
-        row.addEventListener('touchstart', handleTouchStart, { passive: false })
-        row.addEventListener('touchmove', handleTouchMove, { passive: false })
-        row.addEventListener('touchend', handleTouchEnd)
-      })
-    }
-    
-    // 延迟初始化，等待 DOM 渲染
-    const timer = setTimeout(initHotRowSwipe, 100)
-    return () => clearTimeout(timer)
-  }, [movieList, tvList, listCn, listKrjp])
+  // 初始化触摸滑动支持（已通过 CSS touch-action 处理，无需 JavaScript）
+  // CSS 已设置：
+  // - touch-action: pan-y pinch-zoom (桌面端允许垂直滚动)
+  // - touch-action: pan-x pan-y (触摸设备允许水平和垂直滚动)
+  // - overflow-x: auto (触摸设备启用水平滚动)
+  // 无需额外的 JavaScript 事件监听
 
   // 获取所有榜单数据
   const fetchAllLists = useCallback(async () => {
@@ -243,12 +207,51 @@ export default function JilaotvPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 加载静态数据
+  const loadStaticData = useCallback(async () => {
+    console.log('📦 [加载静态数据] 开始...')
+    
+    try {
+      const res = await fetch('/static-data.json')
+      if (!res.ok) {
+        console.warn('⚠️ 静态数据文件不存在')
+        return
+      }
+      
+      const data = await res.json()
+      console.log('✅ 静态数据加载成功')
+      
+      // 设置静态数据
+      if (data.movieList) setMovieList(data.movieList)
+      if (data.tvList) setTvList(data.tvList)
+      if (data.listCn) setListCn(data.listCn)
+      if (data.listKrjp) setListKrjp(data.listKrjp)
+      if (data.heroList) setHeroList(data.heroList)
+      
+      console.log('📊 静态数据统计:', {
+        电影: data.movieList?.length || 0,
+        剧集: data.tvList?.length || 0,
+        华语: data.listCn?.length || 0,
+        日韩: data.listKrjp?.length || 0,
+        Hero: data.heroList?.length || 0
+      })
+    } catch (error) {
+      console.error('❌ 加载静态数据失败:', error)
+    }
+  }, [])
+
   // 初始化数据
   useEffect(() => {
     console.log('🚀 [页面初始化] 开始加载数据...')
-    fetchAllLists()
-    fetchHero()
-  }, [fetchAllLists, fetchHero])
+    
+    // 先加载静态数据
+    loadStaticData().then(() => {
+      console.log('📡 静态数据加载完成，开始获取动态数据...')
+      // 然后异步获取动态数据
+      fetchAllLists()
+      fetchHero()
+    })
+  }, [loadStaticData, fetchAllLists, fetchHero])
 
   // DPlayer 初始化
   useEffect(() => {
@@ -493,7 +496,22 @@ export default function JilaotvPage() {
   // 获取最终海报
   const finalPoster = (item: MovieItem | Group, isHot = false) => {
     const name = isHot ? (item as MovieItem).title || (item as MovieItem).name || '' : (item as Group).name
-    return imageMap[name] || (isHot ? `https://daili.smdhb.com/t/p/w300${(item as MovieItem).poster_path}` : (item as Group).pic)
+    
+    // 优先使用 imageMap 中的图片
+    if (imageMap[name]) {
+      return imageMap[name]
+    }
+    
+    // 处理静态数据中的图片路径
+    const posterPath = isHot ? (item as MovieItem).poster_path : ''
+    
+    // 如果是静态数据的相对路径（以 / 开头），使用本地静态图片
+    if (posterPath && posterPath.startsWith('/')) {
+      return `/static-images${posterPath}`
+    }
+    
+    // 否则使用远程图片
+    return isHot ? `https://daili.smdhb.com/t/p/w300${posterPath}` : (item as Group).pic
   }
 
   // 判断是否使用 fallback
