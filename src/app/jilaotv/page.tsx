@@ -97,6 +97,8 @@ export default function JilaotvPage() {
   const TMDB_IMG_URL = `${MY_PROXY}/t/p/w500`
   const TMDB_BACKDROP_URL = `${MY_PROXY}/t/p/original`
 
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+
   // 切换主题
   const toggleTheme = () => {
     setIsDark(!isDark)
@@ -411,10 +413,12 @@ export default function JilaotvPage() {
 
   // 图片错误处理
   const handleImgError = async (name: string) => {
-    if (imageMap[name] || fallbackMap[name]) return
+    // 如果已经有图片、正在加载中、或者已经 fallback 过，都跳过
+    if (imageMap[name] || loadingMap[name] || fallbackMap[name]) return
     
     console.log('🖼️ [图片 Fallback]', name)
-    setFallbackMap(prev => ({ ...prev, [name]: true }))
+    setLoadingMap(prev => ({ ...prev, [name]: true }))  // 标记为加载中
+    setFallbackMap(prev => ({ ...prev, [name]: true })) // 立即显示 fallback
     
     const cleanName = name.replace(/第[0-9一二三四五六七八九十]+[季部]/g, '')
       .replace(/Season\s*\d+/ig, '')
@@ -434,7 +438,7 @@ export default function JilaotvPage() {
         if (found.poster_path) {
           console.log('✅ 找到图片:', found.title || found.name)
           setImageMap(prev => ({ ...prev, [name]: `${TMDB_IMG_URL}${found.poster_path}` }))
-          setFallbackMap(prev => ({ ...prev, [name]: false }))
+          setFallbackMap(prev => ({ ...prev, [name]: false })) // 有图才取消 fallback
         } else {
           console.warn('⚠️ 未找到图片')
         }
@@ -443,6 +447,8 @@ export default function JilaotvPage() {
       }
     } catch (error) {
       console.error('❌ 图片 Fallback 失败:', error)
+    } finally {
+      setLoadingMap(prev => ({ ...prev, [name]: false }))
     }
   }
 
@@ -680,12 +686,14 @@ export default function JilaotvPage() {
 
   // ResultCard 组件
   const ResultCard = ({ group }: { group: Group }) => {
+    const posterSrc = imageMap[group.name] || (fallbackMap[group.name] ? null : group.pic)
+    
     return (
       <div className="result-card" onClick={() => openDetail(group)}>
         <div className="poster-wrap">
-          {!isFallback(group.name) ? (
+          {posterSrc ? (
             <img 
-              src={finalPoster(group)} 
+              src={posterSrc} 
               alt={group.name}
               referrerPolicy="no-referrer"
               onError={() => handleImgError(group.name)}
