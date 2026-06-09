@@ -686,25 +686,26 @@ export default function JilaotvPage() {
 
   // ResultCard 组件
   const ResultCard = ({ group }: { group: Group }) => {
-    const posterSrc = imageMap[group.name] || (fallbackMap[group.name] ? null : group.pic)
+    // 优先使用 imageMap 中的图片，其次用原始图片，都没有则用占位图
+    const posterSrc = imageMap[group.name] || group.pic || '/static-images/jilaoTV.jpg'
+    // 判断是否是占位图
+    const isPlaceholder = posterSrc === '/static-images/jilaoTV.jpg'
     
     return (
       <div className="result-card" onClick={() => openDetail(group)}>
         <div className="poster-wrap">
-          {posterSrc ? (
-            <img 
-              src={posterSrc} 
-              alt={group.name}
-              referrerPolicy="no-referrer"
-              onError={() => handleImgError(group.name)}
-              loading="lazy"
-            />
-          ) : (
-            <div className="poster-fallback">
-              <Film className="w-12 h-12 mb-2 opacity-50" />
-              <div style={{ fontSize: '12px', color: '#999' }}>{group.name}</div>
-            </div>
-          )}
+          <img 
+            src={posterSrc} 
+            alt={group.name}
+            referrerPolicy="no-referrer"
+            onError={() => {
+              // 只有非占位图才触发搜索
+              if (!isPlaceholder) {
+                handleImgError(group.name)
+              }
+            }}
+            loading="lazy"
+          />
           <div className="rating-badge" style={{ background: '#e50914', color: '#fff', border: 'none' }}>
             {group.sources.length} 源
           </div>
