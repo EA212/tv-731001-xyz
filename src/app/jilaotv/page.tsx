@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2, Sun, Moon } from 'lucide-react'
 
@@ -69,7 +69,8 @@ declare global {
   }
 }
 
-export default function JilaotvPage() {
+// 主内容组件（需要 Suspense 包裹）
+function JilaotvContent() {
   // 路由管理
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1168,6 +1169,19 @@ export default function JilaotvPage() {
       <Script src="/js/hls.min.js" />
       <Script src="/js/DPlayer.min.js" />
     </div>
+  )
+}
+
+// 导出页面组件，用 Suspense 包裹
+export default function JilaotvPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-[#141414]">
+        <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+      </div>
+    }>
+      <JilaotvContent />
+    </Suspense>
   )
 }
 
