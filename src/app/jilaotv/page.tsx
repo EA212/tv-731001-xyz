@@ -22,9 +22,21 @@ interface SearchResult {
   vod_name: string
   vod_pic: string
   vod_id: string
-  site_key: string
   site_name: string
+  site_key: string
   latency?: number
+}
+
+// 静态数据中的电影/剧集项
+interface MovieItem {
+  id: number
+  title?: string
+  name?: string
+  poster_path: string
+  vote_average: number
+  release_date?: string
+  first_air_date?: string
+  overview?: string
 }
 
 interface Episode {
@@ -76,6 +88,9 @@ function JilaotvContent() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   
+  // 精简版模式检测（从URL参数或localStorage读取）
+  const [isLiteMode, setIsLiteMode] = useState(false)
+  
   // 状态管理
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -108,6 +123,22 @@ function JilaotvContent() {
   const TMDB_BACKDROP_URL = `${MY_PROXY}/t/p/original`
 
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+
+  // 检测精简版模式
+  useEffect(() => {
+    const mode = searchParams.get('mode')
+    const storedMode = localStorage.getItem('jilaotv-mode')
+    
+    if (mode === 'lite' || storedMode === 'lite') {
+      console.log('📱 使用精简版模式')
+      setIsLiteMode(true)
+      // 保存到localStorage，后续访问自动使用精简版
+      localStorage.setItem('jilaotv-mode', 'lite')
+    } else {
+      console.log('💻 使用完整版模式')
+      setIsLiteMode(false)
+    }
+  }, [searchParams])
 
   // 切换主题
   const toggleTheme = () => {
@@ -602,30 +633,6 @@ function JilaotvContent() {
     return Object.values(groups).sort((a, b) => b.sources.length - a.sources.length)
   }
 
-  // 获取最终海报
-  const finalPoster = (item: MovieItem | Group, isHot = false) => {
-    const name = isHot ? (item as MovieItem).title || (item as MovieItem).name || '' : (item as Group).name
-    
-    // 优先使用 imageMap 中的图片
-    if (imageMap[name]) {
-      return imageMap[name]
-    }
-    
-    // 处理静态数据中的图片路径
-    const posterPath = isHot ? (item as MovieItem).poster_path : ''
-    
-    // 如果是静态数据的相对路径（以 / 开头），使用本地静态图片
-    if (posterPath && posterPath.startsWith('/')) {
-      return `/static-images${posterPath}`
-    }
-    
-    // 否则使用远程图片
-    return isHot ? `https://daili.smdhb.com/t/p/w300${posterPath}` : (item as Group).pic
-  }
-
-  // 判断是否使用 fallback
-  const isFallback = (name: string) => fallbackMap[name] === true
-
   // 打开详情页
   const openDetail = (group: Group) => {
     console.log('🎬 [打开详情]', group.name, '共', group.sources.length, '个源')
@@ -837,6 +844,11 @@ function JilaotvContent() {
         <div className="movie-name">{group.name}</div>
       </div>
     )
+  }
+
+  // 根据模式渲染不同版本
+  if (isLiteMode) {
+    return <JilaotvLiteContent />
   }
 
   return (
@@ -1200,4 +1212,592 @@ function Script({ src }: { src: string }) {
   }, [src])
   
   return null
+}
+
+// ==================== 精简版组件 ====================
+// 专为低端设备设计，使用最基础的CSS和HTML，避免高级特性
+// 使用 static-data.json 中的固定数据，不依赖 TMDb API
+
+function JilaotvLiteContent() {
+  // 状态管理（精简版独立的状态）
+  const [keyword, setKeyword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const [rawList, setRawList] = useState<SearchResult[]>([])
+  const [showDetail, setShowDetail] = useState(false)
+  const [currentGroup, setCurrentGroup] = useState<Group | null>(null)
+  const [episodeList, setEpisodeList] = useState<Episode[]>([])
+  const [currentUrl, setCurrentUrl] = useState('')
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  
+  // 静态数据（从 static-data.json 加载）
+  const [staticData, setStaticData] = useState<{
+    movieList: MovieItem[]
+    tvList: MovieItem[]
+    listCn: MovieItem[]
+    listKrjp: MovieItem[]
+  } | null>(null)
+
+  // 搜索 API
+  const SEARCH_API = 'https://api.smdhb.com/api.php/provide/vod/?ac=detail&wd='
+
+  // 将 poster_path 转换为静态图片路径
+  const getStaticImagePath = (posterPath: string) => {
+    // 移除开头的 /，然后添加 /static-images/
+    const filename = posterPath.startsWith('/') ? posterPath.slice(1) : posterPath
+    return `/static-images/${filename}`
+  }
+
+  // 加载静态数据
+  useEffect(() => {
+    fetch('/static-data.json')
+      .then(res => res.json())
+      .then(data => {
+        console.log('✅ 加载静态数据:', data)
+        setStaticData(data)
+      })
+      .catch(err => {
+        console.error('❌ 加载静态数据失败:', err)
+      })
+  }, [])
+
+  // 精简版搜索功能
+  const doSearch = async (searchKeyword?: string) => {
+    const kw = (searchKeyword || keyword).trim()
+    if (!kw) return
+    
+    setLoading(true)
+    setKeyword(kw)
+    console.log('🔍 [精简版搜索]', kw)
+    
+    try {
+      const res = await fetch(`${SEARCH_API}${encodeURIComponent(kw)}`)
+      const data = await res.json()
+      console.log('✅ 搜索结果:', data.list?.length || 0)
+      setRawList(data.list || [])
+      setSearched(true)
+    } catch (err) {
+      console.error('❌ 搜索失败:', err)
+      setRawList([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 打开详情页
+  const openDetail = async (group: Group) => {
+    setCurrentGroup(group)
+    setShowDetail(true)
+    setLoadingDetail(true)
+    setEpisodeList([])
+    setCurrentUrl('')
+    
+    console.log('🎬 [精简版打开详情]', group.name)
+    
+    try {
+      // 获取剧集列表
+      const source = group.sources[0]
+      const res = await fetch(`https://api.smdhb.com/api.php/provide/vod/?ac=detail&ids=${source.vod_id}`)
+      const data = await res.json()
+      
+      if (data.list && data.list[0]) {
+        const vod = data.list[0]
+        // 解析剧集 URL
+        const urls = vod.vod_play_url?.split('#') || []
+        const names = vod.vod_play_note?.split('#') || []
+        
+        const episodes: Episode[] = urls.map((url: string, i: number) => ({
+          name: names[i] || `第${i + 1}集`,
+          url: url.split('$')[1] || url
+        })).filter((ep: Episode) => ep.url)
+        
+        setEpisodeList(episodes)
+        console.log('✅ 剧集列表:', episodes.length)
+        
+        // 自动播放第一集
+        if (episodes.length > 0) {
+          play(episodes[0].url)
+        }
+      }
+    } catch (err) {
+      console.error('❌ 获取剧集失败:', err)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  // 关闭详情页
+  const closeDetail = () => {
+    setShowDetail(false)
+    setCurrentGroup(null)
+    setEpisodeList([])
+    setCurrentUrl('')
+  }
+
+  // 播放视频
+  const play = (url: string) => {
+    console.log('▶️ [精简版播放]', url)
+    setCurrentUrl(url)
+  }
+
+  return (
+    <div style={{
+      fontFamily: 'sans-serif',
+      backgroundColor: '#141414',
+      color: '#fff',
+      minHeight: '100vh',
+      padding: '10px'
+    }}>
+      {/* 精简版头部 */}
+      <header style={{
+        position: 'sticky',
+        top: 0,
+        backgroundColor: '#1a1a1a',
+        padding: '10px',
+        marginBottom: '10px',
+        zIndex: 100
+      }}>
+        <h1 style={{ margin: '0 0 10px 0', fontSize: '20px' }}>机佬TV (精简版)</h1>
+        
+        {/* 搜索框 */}
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+            placeholder="搜索影片..."
+            style={{
+              flex: 1,
+              padding: '10px',
+              fontSize: '16px',
+              border: '1px solid #333',
+              backgroundColor: '#2a2a2a',
+              color: '#fff',
+              borderRadius: '4px'
+            }}
+          />
+          <button
+            onClick={() => doSearch()}
+            disabled={loading}
+            style={{
+              padding: '10px 20px',
+              fontSize: '16px',
+              backgroundColor: '#e50914',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? '搜索中...' : '搜索'}
+          </button>
+        </div>
+      </header>
+
+      {/* 固定热门列表（搜索前显示） */}
+      {!searched && staticData && (
+        <div>
+          {/* 电影榜 */}
+          <h2 style={{ fontSize: '18px', marginBottom: '10px', color: '#e50914' }}>电影榜</h2>
+          <div style={{ display: 'block' }}>
+            {staticData.movieList.map((movie, index) => (
+              <div
+                key={index}
+                onClick={() => doSearch(movie.title)}
+                style={{
+                  display: 'block',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={getStaticImagePath(movie.poster_path)}
+                    alt={movie.title}
+                    style={{
+                      width: '60px',
+                      height: '90px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      backgroundColor: '#333'
+                    }}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      if (parent && !parent.querySelector('.placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'placeholder'
+                        placeholder.style.cssText = 'width:60px;height:90px;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:4px;'
+                        placeholder.textContent = '无图'
+                        parent.insertBefore(placeholder, e.currentTarget)
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{movie.title}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                      评分: {movie.vote_average} | {movie.release_date?.slice(0, 4)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 剧集榜 */}
+          <h2 style={{ fontSize: '18px', marginBottom: '10px', marginTop: '20px', color: '#e50914' }}>剧集榜</h2>
+          <div style={{ display: 'block' }}>
+            {staticData.tvList.map((tv, index) => (
+              <div
+                key={index}
+                onClick={() => doSearch(tv.name)}
+                style={{
+                  display: 'block',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={getStaticImagePath(tv.poster_path)}
+                    alt={tv.name}
+                    style={{
+                      width: '60px',
+                      height: '90px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      backgroundColor: '#333'
+                    }}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      if (parent && !parent.querySelector('.placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'placeholder'
+                        placeholder.style.cssText = 'width:60px;height:90px;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:4px;'
+                        placeholder.textContent = '无图'
+                        parent.insertBefore(placeholder, e.currentTarget)
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{tv.name}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                      评分: {tv.vote_average} | {tv.first_air_date?.slice(0, 4)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 华语强档 */}
+          <h2 style={{ fontSize: '18px', marginBottom: '10px', marginTop: '20px', color: '#e50914' }}>华语强档</h2>
+          <div style={{ display: 'block' }}>
+            {staticData.listCn.map((cn, index) => (
+              <div
+                key={index}
+                onClick={() => doSearch(cn.name)}
+                style={{
+                  display: 'block',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={getStaticImagePath(cn.poster_path)}
+                    alt={cn.name}
+                    style={{
+                      width: '60px',
+                      height: '90px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      backgroundColor: '#333'
+                    }}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      if (parent && !parent.querySelector('.placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'placeholder'
+                        placeholder.style.cssText = 'width:60px;height:90px;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:4px;'
+                        placeholder.textContent = '无图'
+                        parent.insertBefore(placeholder, e.currentTarget)
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{cn.name}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                      评分: {cn.vote_average} | {cn.first_air_date?.slice(0, 4)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 日韩潮流 */}
+          <h2 style={{ fontSize: '18px', marginBottom: '10px', marginTop: '20px', color: '#e50914' }}>日韩潮流</h2>
+          <div style={{ display: 'block' }}>
+            {staticData.listKrjp.map((krjp, index) => (
+              <div
+                key={index}
+                onClick={() => doSearch(krjp.name)}
+                style={{
+                  display: 'block',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={getStaticImagePath(krjp.poster_path)}
+                    alt={krjp.name}
+                    style={{
+                      width: '60px',
+                      height: '90px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      backgroundColor: '#333'
+                    }}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      if (parent && !parent.querySelector('.placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'placeholder'
+                        placeholder.style.cssText = 'width:60px;height:90px;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:4px;'
+                        placeholder.textContent = '无图'
+                        parent.insertBefore(placeholder, e.currentTarget)
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{krjp.name}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                      评分: {krjp.vote_average} | {krjp.first_air_date?.slice(0, 4)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 加载静态数据提示 */}
+      {!searched && !staticData && (
+        <div style={{ textAlign: 'center', padding: '50px 20px', color: '#888' }}>
+          <p style={{ fontSize: '18px' }}>加载中...</p>
+        </div>
+      )}
+
+      {/* 搜索结果列表 */}
+      {searched && (
+        <div>
+          <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>搜索结果 ({rawList.length})</h2>
+          
+          {rawList.length === 0 && !loading && (
+            <p style={{ color: '#888' }}>未找到相关结果</p>
+          )}
+          
+          <div style={{ display: 'block' }}>
+            {rawList.map((item, index) => (
+              <div
+                key={index}
+                onClick={() => openDetail({
+                  name: item.vod_name,
+                  pic: item.vod_pic,
+                  sources: [{ site_name: item.site_name, site_key: item.site_key, vod_id: item.vod_id }]
+                })}
+                style={{
+                  display: 'block',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={item.vod_pic}
+                    alt={item.vod_name}
+                    style={{
+                      width: '60px',
+                      height: '90px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      backgroundColor: '#333'
+                    }}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      const parent = e.currentTarget.parentElement
+                      if (parent && !parent.querySelector('.placeholder')) {
+                        const placeholder = document.createElement('div')
+                        placeholder.className = 'placeholder'
+                        placeholder.style.cssText = 'width:60px;height:90px;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:4px;'
+                        placeholder.textContent = '无图'
+                        parent.insertBefore(placeholder, e.currentTarget)
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{item.vod_name}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                      来源: {item.site_name}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* 返回热门列表按钮 */}
+          <button
+            onClick={() => {
+              setSearched(false)
+              setRawList([])
+              setKeyword('')
+            }}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              fontSize: '14px',
+              backgroundColor: '#333',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            返回热门列表
+          </button>
+        </div>
+      )}
+
+      {/* 详情弹窗 */}
+      {showDetail && currentGroup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.9)',
+          zIndex: 1000,
+          overflow: 'auto',
+          padding: '10px'
+        }}>
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '8px',
+            padding: '15px',
+            maxWidth: '600px',
+            margin: '0 auto'
+          }}>
+            {/* 关闭按钮 */}
+            <button
+              onClick={closeDetail}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                padding: '5px 10px',
+                backgroundColor: '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              关闭
+            </button>
+
+            {/* 影片信息 */}
+            <h2 style={{ margin: '0 0 15px 0', fontSize: '20px' }}>{currentGroup.name}</h2>
+            <img
+              src={currentGroup.pic}
+              alt={currentGroup.name}
+              style={{
+                width: '100%',
+                maxWidth: '200px',
+                borderRadius: '4px',
+                marginBottom: '15px',
+                backgroundColor: '#333'
+              }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+
+            {/* 播放器 */}
+            {currentUrl && (
+              <div style={{ marginBottom: '15px' }}>
+                <video
+                  src={currentUrl}
+                  controls
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#000',
+                    borderRadius: '4px'
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 选集列表 */}
+            <div>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>选集播放</h3>
+              {loadingDetail ? (
+                <p style={{ color: '#888' }}>加载中...</p>
+              ) : (
+                <div style={{ display: 'block' }}>
+                  {episodeList.map((ep, index) => (
+                    <button
+                      key={index}
+                      onClick={() => play(ep.url)}
+                      style={{
+                        display: 'inline-block',
+                        padding: '8px 12px',
+                        margin: '5px',
+                        backgroundColor: currentUrl === ep.url ? '#e50914' : '#333',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {ep.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
