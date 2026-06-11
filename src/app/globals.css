@@ -87,7 +87,7 @@ body {
 
 /* 导航栏 */
 .navbar-custom {
-  padding: 15px 4%;
+  padding: clamp(12px, 2vw, 15px) clamp(3%, 4vw, 4%);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -96,16 +96,16 @@ body {
 
 .navbar-custom.scrolled {
   background: #141414;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(12px, 2vw, 20px) rgba(0, 0, 0, 0.6);
 }
 
 .navbar-custom .brand {
-  font-size: 26px;
+  font-size: clamp(1.25rem, 2.5vw, 1.625rem);
   font-weight: 800;
   color: var(--jl-accent);
   text-transform: uppercase;
   letter-spacing: 1px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 clamp(1px, 0.3vw, 2px) clamp(6px, 1vw, 10px) rgba(0, 0, 0, 0.8);
 }
 
 /* Hero */
@@ -154,35 +154,35 @@ body {
 }
 
 .hero-content {
-  max-width: 600px;
-  margin-top: 60px;
+  max-width: clamp(350px, 50vw, 600px);
+  margin-top: clamp(40px, 5vw, 60px);
 }
 
 .hero-tag {
   background: rgba(255, 255, 255, 0.2);
-  padding: 4px 10px;
+  padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1vw, 10px);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: clamp(0.625rem, 0.9vw, 0.6875rem);
   font-weight: bold;
   text-transform: uppercase;
   display: inline-block;
-  margin-bottom: 15px;
+  margin-bottom: clamp(10px, 1.5vw, 15px);
   backdrop-filter: blur(5px);
 }
 
 .hero-title {
-  font-size: 3.5rem;
+  font-size: clamp(1.5rem, 4vw, 3.5rem);
   font-weight: 900;
   line-height: 1.1;
-  margin-bottom: 15px;
+  margin-bottom: clamp(10px, 1.5vw, 15px);
   text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
 }
 
 .hero-desc {
-  font-size: 1.1rem;
+  font-size: clamp(0.875rem, 1.3vw, 1.1rem);
   color: #ddd;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-  margin-bottom: 25px;
+  margin-bottom: clamp(15px, 2vw, 25px);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -193,13 +193,13 @@ body {
   background: #fff;
   color: #000;
   border: none;
-  padding: 10px 30px;
-  font-size: 1.2rem;
+  padding: clamp(8px, 1.5vw, 10px) clamp(20px, 3vw, 30px);
+  font-size: clamp(0.875rem, 1.5vw, 1.2rem);
   font-weight: 700;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
   cursor: pointer;
   transition: 0.2s;
 }
@@ -212,17 +212,17 @@ body {
   background: rgba(109, 109, 110, 0.7);
   color: #fff;
   border: none;
-  padding: 10px 30px;
-  font-size: 1.2rem;
+  padding: clamp(8px, 1.5vw, 10px) clamp(20px, 3vw, 30px);
+  font-size: clamp(0.875rem, 1.5vw, 1.2rem);
   font-weight: 700;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
   cursor: pointer;
   transition: 0.2s;
   backdrop-filter: blur(5px);
-  margin-top: 15px;
+  margin-top: clamp(10px, 1.5vw, 15px);
 }
 
 .btn-info:hover {
@@ -232,21 +232,21 @@ body {
 /* 搜索框 */
 .search-section {
   position: relative;
-  margin-top: -35px;
+  margin-top: clamp(-25px, -3vw, -35px);
   z-index: 20;
-  padding: 0 5%;
-  margin-bottom: 40px;
+  padding: 0 clamp(3%, 5vw, 5%);
+  margin-bottom: clamp(25px, 3vw, 40px);
 }
 
 .search-box-wrapper {
   background: rgba(30, 30, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(20px);
-  border-radius: 8px;
+  border-radius: clamp(6px, 1vw, 8px);
   display: flex;
   align-items: center;
   transition: 0.3s;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 clamp(6px, 1vw, 10px) clamp(20px, 2.5vw, 30px) rgba(0, 0, 0, 0.5);
 }
 
 .search-box-wrapper:focus-within {
@@ -255,64 +255,65 @@ body {
 }
 
 .search-icon {
-  padding: 0 20px;
+  padding: 0 clamp(10px, 2vw, 20px);
   color: #888;
-  font-size: 18px;
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
   cursor: pointer;
 }
 
 .search-input {
   width: 100%;
-  height: 60px;
+  min-height: clamp(44px, 5vw, 60px);
   background: transparent;
   border: none;
   color: #fff;
-  font-size: 18px;
+  font-size: clamp(0.875rem, 1.5vw, 1.125rem);
   outline: none;
+  padding: clamp(8px, 1vw, 12px) 0;
 }
 
 /* 列表通用 */
 .section-container {
-  padding: 0 5%;
-  margin-bottom: 40px;
+  padding: 0 clamp(3%, 5vw, 5%);
+  margin-bottom: clamp(20px, 3vw, 40px);
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: clamp(12px, 2vw, 20px);
   position: relative;
 }
 
 .section-line {
-  width: 4px;
-  height: 22px;
+  width: clamp(3px, 0.4vw, 4px);
+  height: clamp(16px, 2vw, 22px);
   background: var(--jl-accent);
   border-radius: 2px;
-  margin-right: 12px;
+  margin-right: clamp(8px, 1vw, 12px);
 }
 
 .section-title {
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 1.8vw, 1.4rem);
   font-weight: 700;
   color: #fff;
   margin: 0;
   line-height: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
 }
 
 /* 热榜导航按钮 */
 .hot-row-nav {
   display: flex;
-  gap: 8px;
+  gap: clamp(6px, 1vw, 8px);
   margin-left: auto;
 }
 
 .nav-btn {
-  width: 32px;
-  height: 32px;
+  width: clamp(28px, 3vw, 32px);
+  height: clamp(28px, 3vw, 32px);
   border: none;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
@@ -344,10 +345,10 @@ body {
 /* 热榜滚动区域 - 基础样式（适用于所有设备） */
 .hot-row {
   display: flex;
-  gap: 14px;
+  gap: clamp(10px, 1.5vw, 14px);
   overflow-x: hidden;        /* 默认隐藏水平滚动，不劫持鼠标滚轮 */
   overflow-y: hidden;
-  padding-bottom: 20px;
+  padding-bottom: clamp(12px, 2vw, 20px);
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
@@ -355,8 +356,8 @@ body {
   -ms-overflow-style: none;
   cursor: default;           /* 非触摸设备不用抓取光标 */
   user-select: none;
-  padding: 0 20px 20px;
-  margin: 0 -20px;
+  padding: 0 clamp(12px, 2vw, 20px) clamp(12px, 2vw, 20px);
+  margin: 0 clamp(-12px, -2vw, -20px);
   touch-action: pan-y pinch-zoom;  /* 允许触摸垂直滚动 */
   overscroll-behavior: contain;    /* 防止滚动链，避免滚动穿透 */
 }
@@ -380,8 +381,8 @@ body {
 }
 
 .hot-card {
-  min-width: 150px;
-  width: 150px;
+  min-width: clamp(100px, 15vw, 150px);
+  width: clamp(100px, 15vw, 150px);
   cursor: pointer;
   transition: 0.3s;
   position: relative;
@@ -397,11 +398,11 @@ body {
 .poster-wrap {
   width: 100%;
   aspect-ratio: 2/3;
-  border-radius: 6px;
+  border-radius: clamp(4px, 0.8vw, 6px);
   overflow: hidden;
   background: #222;
   position: relative;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(6px, 1vw, 10px) rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -414,28 +415,28 @@ body {
 
 .rating-badge {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: clamp(4px, 0.8vw, 6px);
+  right: clamp(4px, 0.8vw, 6px);
   background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(4px);
   color: #46d369;
   font-weight: bold;
-  font-size: 11px;
-  padding: 2px 6px;
+  font-size: clamp(0.625rem, 0.9vw, 0.6875rem);
+  padding: clamp(1px, 0.3vw, 2px) clamp(4px, 0.6vw, 6px);
   border-radius: 4px;
   border: 1px solid rgba(70, 211, 105, 0.3);
 }
 
 .rank-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: clamp(4px, 0.8vw, 6px);
+  left: clamp(4px, 0.8vw, 6px);
   background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(4px);
   color: #fff;
   font-weight: 900;
-  font-size: 24px;
-  padding: 4px 10px;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1vw, 10px);
   border-radius: 4px;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
@@ -448,13 +449,13 @@ body {
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, #333 0%, #111 100%);
-  padding: 5px;
+  padding: clamp(3px, 0.5vw, 5px);
   text-align: center;
 }
 
 .movie-name {
-  margin-top: 10px;
-  font-size: 14px;
+  margin-top: clamp(6px, 1vw, 10px);
+  font-size: clamp(0.75rem, 1.2vw, 0.875rem);
   color: #eee;
   white-space: nowrap;
   overflow: hidden;
@@ -464,17 +465,17 @@ body {
 }
 
 .movie-date {
-  font-size: 12px;
+  font-size: clamp(0.625rem, 1vw, 0.75rem);
   color: #666;
   text-align: center;
-  margin-top: 2px;
+  margin-top: clamp(2px, 0.5vw, 4px);
 }
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 20px;
-  min-height: 300px;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(110px, 18vw, 160px), 1fr));
+  gap: clamp(12px, 2vw, 20px);
+  min-height: clamp(200px, 25vw, 300px);
 }
 
 .result-card {
@@ -517,10 +518,10 @@ body {
 
 .close-btn {
   position: fixed;
-  top: 25px;
-  right: 30px;
-  width: 44px;
-  height: 44px;
+  top: clamp(20px, 3vw, 25px);
+  right: clamp(20px, 3vw, 30px);
+  width: clamp(36px, 4vw, 44px);
+  height: clamp(36px, 4vw, 44px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: flex;
@@ -540,19 +541,19 @@ body {
 }
 
 .player-layout {
-  max-width: 1200px;
+  max-width: clamp(800px, 90vw, 1200px);
   margin: 0 auto;
-  padding: 90px 4% 50px;
+  padding: clamp(60px, 8vw, 90px) clamp(3%, 4vw, 4%) clamp(30px, 5vw, 50px);
 }
 
 .player-box {
   width: 100%;
   aspect-ratio: 16/9;
   background: #000;
-  border-radius: 12px;
+  border-radius: clamp(8px, 1.5vw, 12px);
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  margin-bottom: 30px;
+  box-shadow: 0 clamp(10px, 2vw, 20px) clamp(30px, 5vw, 60px) rgba(0, 0, 0, 0.5);
+  margin-bottom: clamp(20px, 3vw, 30px);
   border: 1px solid #333;
 }
 
@@ -560,37 +561,37 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 25px;
+  margin-bottom: clamp(15px, 2.5vw, 25px);
   flex-wrap: wrap;
-  gap: 20px;
+  gap: clamp(12px, 2vw, 20px);
 }
 
 .video-title {
-  font-size: 2.2rem;
+  font-size: clamp(1.25rem, 2.5vw, 2.2rem);
   font-weight: 800;
   color: #fff;
-  margin-bottom: 5px;
+  margin-bottom: clamp(3px, 0.5vw, 5px);
   line-height: 1.2;
 }
 
 .video-meta {
   color: #888;
-  font-size: 14px;
+  font-size: clamp(0.75rem, 1vw, 0.875rem);
 }
 
 .btn-cast {
-  padding: 10px 20px;
+  padding: clamp(8px, 1.5vw, 10px) clamp(12px, 2vw, 20px);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 30px;
+  border-radius: clamp(20px, 3vw, 30px);
   color: #fff;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: clamp(6px, 1vw, 8px);
   cursor: pointer;
   transition: 0.2s;
-  font-size: 14px;
+  font-size: clamp(0.75rem, 1.2vw, 0.875rem);
 }
 
 .btn-cast:hover {
@@ -600,16 +601,16 @@ body {
 
 .controls-area {
   background: #1f1f1f;
-  border-radius: 12px;
-  padding: 30px;
+  border-radius: clamp(8px, 1.5vw, 12px);
+  padding: clamp(20px, 3vw, 30px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: clamp(0.75rem, 1vw, 0.875rem);
   color: #888;
   font-weight: 700;
-  margin-bottom: 15px;
+  margin-bottom: clamp(10px, 1.5vw, 15px);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -617,12 +618,12 @@ body {
 .source-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 30px;
+  gap: clamp(8px, 1vw, 10px);
+  margin-bottom: clamp(20px, 3vw, 30px);
 }
 
 .source-pill {
-  padding: 8px 16px;
+  padding: clamp(6px, 1vw, 8px) clamp(12px, 1.5vw, 16px);
   border-radius: 6px;
   background: #2a2a2a;
   border: 1px solid #333;
@@ -631,8 +632,8 @@ body {
   transition: 0.2s;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: clamp(6px, 1vw, 8px);
+  font-size: clamp(0.75rem, 1.1vw, 0.8125rem);
   font-weight: 500;
 }
 
@@ -651,18 +652,18 @@ body {
 
 .ep-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(70px, 10vw, 100px), 1fr));
+  gap: clamp(8px, 1.2vw, 12px);
 }
 
 .ep-btn {
   background: #2a2a2a;
   border: 1px solid transparent;
   color: #ddd;
-  padding: 12px 5px;
+  padding: clamp(8px, 1vw, 12px) clamp(3px, 0.5vw, 5px);
   text-align: center;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: clamp(0.75rem, 1.2vw, 0.875rem);
   cursor: pointer;
   transition: 0.2s;
   white-space: nowrap;
@@ -684,14 +685,14 @@ body {
 }
 
 .latency-dot {
-  width: 6px;
-  height: 6px;
+  width: clamp(4px, 0.6vw, 6px);
+  height: clamp(4px, 0.6vw, 6px);
   border-radius: 50%;
 }
 
 .dot-green {
   background: #46d369;
-  box-shadow: 0 0 5px #46d369;
+  box-shadow: 0 0 clamp(3px, 0.5vw, 5px) #46d369;
 }
 
 .dot-yellow {
@@ -704,47 +705,37 @@ body {
 
 .footer {
   text-align: center;
-  font-size: 12px;
+  font-size: clamp(0.625rem, 0.9vw, 0.75rem);
   color: #444;
-  margin-top: 80px;
-  padding-bottom: 20px;
+  margin-top: clamp(50px, 6vw, 80px);
+  padding-bottom: clamp(12px, 2vw, 20px);
 }
 
-/* 响应式 */
+/* 响应式 - 只保留必要的断点调整 */
 @media (max-width: 768px) {
   .carousel-item {
     height: 55vh;
   }
 
   .hero-title {
-    font-size: 2.2rem;
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
   }
 
   .btn-play,
   .btn-info {
-    padding: 8px 20px;
-    font-size: 1rem;
+    padding: clamp(6px, 2vw, 8px) clamp(12px, 3vw, 20px);
+    font-size: clamp(0.875rem, 2vw, 1rem);
   }
 
   .hot-row-nav {
     display: none;
   }
-
-  .hot-row {
-    padding: 0 15px 20px;
-    margin: 0 -15px;
-  }
-
-  .hot-card {
-    min-width: 120px;
-    width: 120px;
-  }
 }
 
 /* ====== 主题切换 ====== */
 .theme-toggle {
-  width: 40px;
-  height: 40px;
+  width: clamp(32px, 4vw, 40px);
+  height: clamp(32px, 4vw, 40px);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -962,23 +953,23 @@ body {
 }
 
 .skeleton-card {
-  min-width: 150px;
-  width: 150px;
+  min-width: clamp(100px, 15vw, 150px);
+  width: clamp(100px, 15vw, 150px);
   flex-shrink: 0;
 }
 
 .skeleton-poster {
   width: 100%;
   aspect-ratio: 2/3;
-  border-radius: 6px;
+  border-radius: clamp(4px, 0.8vw, 6px);
   background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
 }
 
 .skeleton-text {
-  height: 14px;
-  margin-top: 10px;
+  height: clamp(10px, 1.2vw, 14px);
+  margin-top: clamp(6px, 1vw, 10px);
   background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
@@ -986,9 +977,9 @@ body {
 }
 
 .skeleton-text-sm {
-  height: 12px;
+  height: clamp(8px, 1vw, 12px);
   width: 60%;
-  margin: 4px auto 0;
+  margin: clamp(2px, 0.5vw, 4px) auto 0;
   background: linear-gradient(90deg, #1a1a1a 0px, #2a2a2a 40px, #1a1a1a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
@@ -1007,48 +998,48 @@ body {
   position: absolute;
   bottom: 30%;
   left: 5%;
-  width: 400px;
+  width: clamp(250px, 40vw, 400px);
 }
 
 .skeleton-hero-tag {
-  width: 100px;
-  height: 24px;
+  width: clamp(80px, 12vw, 100px);
+  height: clamp(18px, 2.5vw, 24px);
   background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
   border-radius: 4px;
-  margin-bottom: 15px;
+  margin-bottom: clamp(10px, 1.5vw, 15px);
 }
 
 .skeleton-hero-title {
   width: 80%;
-  height: 50px;
+  height: clamp(30px, 4vw, 50px);
   background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
   border-radius: 4px;
-  margin-bottom: 15px;
+  margin-bottom: clamp(10px, 1.5vw, 15px);
 }
 
 .skeleton-hero-desc {
   width: 100%;
-  height: 20px;
+  height: clamp(14px, 2vw, 20px);
   background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
   border-radius: 4px;
-  margin-bottom: 10px;
+  margin-bottom: clamp(6px, 1vw, 10px);
 }
 
 .skeleton-hero-btn {
-  width: 120px;
-  height: 44px;
+  width: clamp(90px, 12vw, 120px);
+  height: clamp(32px, 4vw, 44px);
   background: linear-gradient(90deg, #3a3a3a 0px, #4a4a4a 40px, #3a3a3a 80px);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
   border-radius: 4px;
   display: inline-block;
-  margin-right: 15px;
+  margin-right: clamp(10px, 1.5vw, 15px);
 }
 
 /* 亮色主题骨架屏 */
@@ -1058,205 +1049,6 @@ body {
 [data-theme="light"] .skeleton-text-sm {
   background: linear-gradient(90deg, #e0e0e0 0px, #f0f0f0 40px, #e0e0e0 80px);
   background-size: 200px 100%;
-}
-
-@media (max-width: 768px) {
-  .skeleton-hero-content {
-    width: 280px;
-  }
-  
-  .skeleton-hero-title {
-    height: 36px;
-  }
-}
-
-/* ====== 移动端深度优化 ====== */
-@media (max-width: 768px) {
-  /* 导航栏优化 */
-  .navbar-custom {
-    padding: 12px 3%;
-  }
-  
-  .navbar-custom .brand {
-    font-size: 20px;
-  }
-  
-  /* Hero 区域优化 */
-  .hero-content {
-    margin-top: 30px;
-    padding: 0 10px;
-  }
-  
-  .hero-overlay {
-    padding-left: 3%;
-  }
-  
-  /* 搜索框优化 */
-  .search-section {
-    margin-top: -25px;
-    padding: 0 3%;
-  }
-  
-  .search-input {
-    height: 50px;
-    font-size: 16px;
-  }
-  
-  .search-icon {
-    padding: 0 15px;
-  }
-  
-  /* 列表区域优化 */
-  .section-container {
-    padding: 0 3%;
-    margin-bottom: 30px;
-  }
-  
-  .section-title {
-    font-size: 1.1rem;
-  }
-  
-  /* 热榜卡片优化 */
-  .hot-card {
-    min-width: 110px;
-    width: 110px;
-  }
-  
-  .hot-row {
-    padding: 0 10px 15px;
-    margin: 0 -10px;
-    gap: 10px;
-  }
-  
-  .movie-name {
-    font-size: 12px;
-    margin-top: 8px;
-  }
-  
-  .movie-date {
-    font-size: 10px;
-  }
-  
-  /* 搜索结果网格优化 */
-  .result-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 15px;
-  }
-  
-  /* 播放详情页优化 */
-  .detail-overlay {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  .player-layout {
-    padding: 70px 3% 30px;
-  }
-  
-  .video-header {
-    flex-direction: column;
-    gap: 15px;
-    margin-bottom: 20px;
-  }
-  
-  .video-title {
-    font-size: 1.5rem;
-    line-height: 1.3;
-  }
-  
-  .video-meta {
-    font-size: 12px;
-  }
-  
-  /* 投屏按钮优化 */
-  .btn-cast {
-    padding: 8px 16px;
-    font-size: 12px;
-    align-self: flex-start;
-  }
-  
-  /* 播放器区域优化 */
-  .player-box {
-    aspect-ratio: 16/9;
-    border-radius: 8px;
-    margin-bottom: 20px;
-  }
-  
-  /* 控制面板优化 */
-  .controls-area {
-    padding: 20px 15px;
-    border-radius: 8px;
-  }
-  
-  .panel-title {
-    font-size: 12px;
-    margin-bottom: 12px;
-  }
-  
-  /* 线路选择优化 */
-  .source-list {
-    gap: 8px;
-    margin-bottom: 20px;
-  }
-  
-  .source-pill {
-    padding: 6px 12px;
-    font-size: 11px;
-    gap: 6px;
-  }
-  
-  /* 选集按钮优化 */
-  .ep-grid {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-    gap: 8px;
-  }
-  
-  .ep-btn {
-    padding: 10px 4px;
-    font-size: 12px;
-    border-radius: 4px;
-  }
-  
-  /* 关闭按钮优化 */
-  .close-btn {
-    top: 15px;
-    right: 15px;
-    width: 36px;
-    height: 36px;
-  }
-  
-  /* 页脚优化 */
-  .footer {
-    margin-top: 50px;
-    padding: 0 3% 15px;
-  }
-}
-
-/* ====== 超小屏幕优化 (< 375px) ====== */
-@media (max-width: 375px) {
-  .hot-card {
-    min-width: 100px;
-    width: 100px;
-  }
-  
-  .result-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 10px;
-  }
-  
-  .video-title {
-    font-size: 1.2rem;
-  }
-  
-  .ep-grid {
-    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-    gap: 6px;
-  }
-  
-  .ep-btn {
-    padding: 8px 3px;
-    font-size: 11px;
-  }
 }
 
 /* ====== 横屏模式优化 ====== */
@@ -1279,29 +1071,29 @@ body {
 @media (hover: none) and (pointer: coarse) {
   /* 增大触摸目标 */
   .hot-card {
-    min-width: 115px;
-    width: 115px;
+    min-width: clamp(100px, 12vw, 115px);
+    width: clamp(100px, 12vw, 115px);
   }
   
   .ep-btn {
-    min-height: 44px;
+    min-height: clamp(40px, 5vw, 44px);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   
   .source-pill {
-    min-height: 44px;
+    min-height: clamp(40px, 5vw, 44px);
   }
   
   .nav-btn {
-    width: 44px;
-    height: 44px;
+    width: clamp(40px, 5vw, 44px);
+    height: clamp(40px, 5vw, 44px);
   }
   
   .close-btn {
-    width: 48px;
-    height: 48px;
+    width: clamp(40px, 5vw, 48px);
+    height: clamp(40px, 5vw, 48px);
   }
   
   /* 禁用 hover 效果避免粘滞 */
@@ -1342,11 +1134,11 @@ body {
   }
   
   .close-btn {
-    right: max(30px, env(safe-area-inset-right));
+    right: max(clamp(20px, 3vw, 30px), env(safe-area-inset-right));
   }
   
   .footer {
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-bottom: max(clamp(12px, 2vw, 20px), env(safe-area-inset-bottom));
   }
 }
 
@@ -1355,9 +1147,9 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #888;
   background: transparent;
-  padding: 6px 12px;
+  padding: clamp(4px, 0.8vw, 6px) clamp(8px, 1.5vw, 12px);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: clamp(0.625rem, 0.9vw, 0.75rem);
   cursor: pointer;
   transition: all 0.2s;
 }

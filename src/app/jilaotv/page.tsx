@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2, Sun, Moon } from 'lucide-react'
 
 // 类型定义
@@ -69,6 +70,11 @@ declare global {
 }
 
 export default function JilaotvPage() {
+  // 路由管理
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  
   // 状态管理
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -90,6 +96,9 @@ export default function JilaotvPage() {
   const [fallbackMap, setFallbackMap] = useState<Record<string, boolean>>({})
   const [isDark, setIsDark] = useState(true) // 黑暗模式状态
   const dplayerRef = useRef<{ destroy: () => void } | null>(null)
+  
+  // 用于防止重复触发 popstate
+  const isInternalNavigation = useRef(false)
 
   const TMDB_API_KEY = 'c36cafd8b15f8b30f416867cfef1b01d'
   const MY_PROXY = 'https://daili.smdhb.com'
@@ -255,6 +264,81 @@ export default function JilaotvPage() {
     })
   }, [loadStaticData, fetchAllLists, fetchHero])
 
+  // 从 URL 参数恢复状态
+  useEffect(() => {
+    const q = searchParams.get('q')
+    const d = searchParams.get('d')
+    
+    console.log('🔗 [URL 参数]', { q, d })
+    
+    // 如果有搜索参数，恢复搜索状态
+    if (q && !searched) {
+      console.log('📝 从 URL 恢复搜索:', q)
+      setKeyword(q)
+      doSearch(q, false) // 不更新 URL，因为已经是从 URL 来的
+    }
+    
+    // 如果有详情参数，需要等搜索完成后恢复详情
+    // 这部分逻辑比较复杂，暂时简化处理
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // 监听浏览器返回事件（popstate）
+  useEffect(() => {
+    const handlePopState = () => {
+      console.log('🔙 [popstate] 浏览器返回事件触发')
+      
+      // 如果是内部导航触发的，忽略
+      if (isInternalNavigation.current) {
+        console.log('⏭️ 内部导航，忽略 popstate')
+        return
+      }
+      
+      // 获取当前 URL 参数
+      const params = new URLSearchParams(window.location.search)
+      const q = params.get('q')
+      const d = params.get('d')
+      
+      console.log('📊 当前 URL 状态:', { q, d, showDetail, searched })
+      
+      // 根据当前状态和 URL 参数决定行为
+      if (showDetail) {
+        // 如果当前在详情页，返回应该关闭详情页
+        console.log('🎬 关闭详情页')
+        setShowDetail(false)
+        setCurrentGroup(null)
+        setCurrentSource(null)
+        setEpisodeList([])
+        setCurrentUrl('')
+        
+        // 销毁播放器
+        if (dplayerRef.current) {
+          try {
+            dplayerRef.current.destroy()
+          } catch {
+            // 忽略销毁错误
+          }
+          dplayerRef.current = null
+        }
+      } else if (searched && !q) {
+        // 如果当前在搜索结果页，但 URL 没有 q 参数，说明要回到首页
+        console.log('🔍 清除搜索，回到首页')
+        setSearched(false)
+        setKeyword('')
+        setRawList([])
+      } else if (q && !searched) {
+        // 如果 URL 有 q 参数但当前不在搜索状态，恢复搜索
+        console.log('📝 恢复搜索:', q)
+        setKeyword(q)
+        doSearch(q, false)
+      }
+    }
+    
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDetail, searched])
+
   // DPlayer 初始化
   useEffect(() => {
     if (!currentUrl || !showDetail) return
@@ -323,7 +407,7 @@ export default function JilaotvPage() {
   }, [currentUrl, showDetail])
 
   // 搜索功能
-  const doSearch = async (searchKeyword?: string) => {
+  const doSearch = async (searchKeyword?: string, updateUrl = true) => {
     const kw = searchKeyword || keyword.trim()
     if (!kw) {
       console.warn('⚠️ 搜索关键词为空，已取消搜索')
@@ -334,6 +418,17 @@ export default function JilaotvPage() {
     console.log('🔍 [开始搜索]')
     console.log('📝 关键词:', kw)
     console.log('⏰ 时间:', new Date().toLocaleTimeString())
+    
+    // 更新 URL（如果不是从 URL 参数恢复的）
+    if (updateUrl) {
+      isInternalNavigation.current = true
+      const params = new URLSearchParams()
+      params.set('q', kw)
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+      setTimeout(() => {
+        isInternalNavigation.current = false
+      }, 100)
+    }
     
     setLoading(true)
     setSearched(true)
@@ -468,6 +563,13 @@ export default function JilaotvPage() {
     setSearched(false)
     setKeyword('')
     setRawList([])
+    
+    // 清除 URL 参数
+    isInternalNavigation.current = true
+    router.push(pathname, { scroll: false })
+    setTimeout(() => {
+      isInternalNavigation.current = false
+    }, 100)
   }
 
   // 计算分组列表
@@ -529,6 +631,16 @@ export default function JilaotvPage() {
     setCurrentGroup(group)
     setShowDetail(true)
     
+    // 更新 URL
+    isInternalNavigation.current = true
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('q', keyword)
+    params.set('d', group.name)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    setTimeout(() => {
+      isInternalNavigation.current = false
+    }, 100)
+    
     console.log('⏳ 开始测速...')
     group.sources.forEach(source => {
       source.latency = '...'
@@ -559,6 +671,17 @@ export default function JilaotvPage() {
   // 关闭详情页
   const closeDetail = () => {
     setShowDetail(false)
+    
+    // 更新 URL - 回到搜索结果页
+    isInternalNavigation.current = true
+    const params = new URLSearchParams()
+    if (keyword) {
+      params.set('q', keyword)
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    setTimeout(() => {
+      isInternalNavigation.current = false
+    }, 100)
   }
 
   // 切换线路
@@ -944,7 +1067,7 @@ export default function JilaotvPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-10">
+          <div className="flex items-center justify-center py-10">
             <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
           </div>
         ) : (
