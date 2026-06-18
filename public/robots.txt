@@ -1,0 +1,5 @@
+# robots.txt for 机佬TV
+# 禁止所有搜索引擎抓取
+
+User-agent: *
+Disallow: /
