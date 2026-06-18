@@ -1102,6 +1102,9 @@ function JilaotvContent() {
       <div className="footer">
         <div>机佬TV 改编 爱吃王哥呆阿龟头 原创</div>
         <div className="text-xs mt-2 opacity-50">Data provided by TMDb & Maccms APIs</div>
+        <div className="text-xs mt-1 opacity-30">
+          版本: {process.env.NEXT_PUBLIC_BUILD_VERSION || '开发版本'}
+        </div>
       </div>
 
       {/* 播放详情页 */}
