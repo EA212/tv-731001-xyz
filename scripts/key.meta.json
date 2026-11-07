@@ -1,0 +1,6 @@
+{
+  "fingerprint": "37cea89049402ed39e2d1f4d178b93a048a806ca5e1ef6eb1cd09acebe128d0c",
+  "length": 32,
+  "generatedAt": "2026-11-07T11:28:23.970Z",
+  "note": "仅用于校验源码与构建产物中是否残留明文密钥，不含密钥本身"
+}

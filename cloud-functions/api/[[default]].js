@@ -154,38 +154,34 @@ app.get("/search", async (req, res) => {
   console.log(`📡 [搜索] 活跃站点数: ${activeSites.length}`);
   console.log(`📡 [搜索] 站点列表: ${activeSites.map(s => s.name).join(', ')}`);
   
+  // 优先 ac=detail：实测 ac=list 在非凡、极速等站不返回 vod_pic，导致搜索
+  // 海报全靠前端逐片名打 TMDb 补图（一次搜索几十并发，容易撞限流）。
+  // detail 带图但响应体大几倍，所以在这里裁剪成 6 个字段再回前端；图片由
+  // 用户浏览器直连各站图床，IP 天然分散，不经过本函数、也不碰任何密钥。
   const promises = activeSites.map(async (site) => {
-    console.log(`⏳ [搜索][${site.name}] 开始搜索...`);
     const startTime = Date.now();
-    
-    try {
-      const url = `${site.api}?ac=list&wd=${encodeURIComponent(wd)}&out=json`;
-      console.log(`📡 [搜索][${site.name}] URL: ${url}`);
-      
-      const response = await axios.get(url, { timeout: 6000 });
-      const data = response.data;
-      const list = data.list || data.data;
-      
-      const duration = Date.now() - startTime;
-      
-      if (list && Array.isArray(list)) {
-        console.log(`✅ [搜索][${site.name}] 成功 - 找到 ${list.length} 条 - 耗时 ${duration}ms`);
-        if (list.length > 0) {
-          console.log(`📦 [搜索][${site.name}] 示例: ${list[0].vod_name}`);
+
+    for (const ac of ["detail", "list"]) {
+      try {
+        const url = `${site.api}?ac=${ac}&wd=${encodeURIComponent(wd)}&out=json`;
+        const response = await axios.get(url, { timeout: 6000 });
+        const list = response.data?.list || response.data?.data;
+
+        if (Array.isArray(list) && list.length > 0) {
+          const duration = Date.now() - startTime;
+          console.log(`✅ [搜索][${site.name}] ${ac} - ${list.length} 条 - ${duration}ms`);
+          return list.slice(0, 20).map(item => ({
+            vod_name: item.vod_name,
+            vod_pic: item.vod_pic || "",
+            vod_id: item.vod_id,
+            site_key: site.key,
+            site_name: site.name,
+            latency: duration
+          }));
         }
-        return list.map(item => ({
-          ...item,
-          site_key: site.key,
-          site_name: site.name,
-          latency: duration
-        }));
-      } else {
-        console.log(`⚠️ [搜索][${site.name}] 返回数据格式异常`);
+      } catch (e) {
+        console.log(`⚠️ [搜索][${site.name}] ${ac} 失败: ${e.code || "unknown"}`);
       }
-    } catch (e) {
-      const duration = Date.now() - startTime;
-      console.log(`❌ [搜索][${site.name}] 失败 - 耗时 ${duration}ms`);
-      console.log(`❌ [搜索][${site.name}] 错误: ${e.code || 'unknown'} - ${e.message}`);
     }
     return [];
   });

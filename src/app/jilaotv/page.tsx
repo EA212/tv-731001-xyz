@@ -4,6 +4,24 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Play, Info, Star, ChevronLeft, ChevronRight, X, Tv, Film, Globe, Sparkles, Loader2, Sun, Moon } from 'lucide-react'
+import {
+  buildTmdbUrl,
+  TMDB_IMG_URL,
+  TMDB_BACKDROP_URL,
+  TMDB_POSTER_SMALL,
+  toStaticImage
+} from '../../lib/tmdb'
+
+/**
+ * 首页静态数据模式（默认开启）
+ * public/static-data.json 已包含 4 个榜单 + 5 张 Hero，public/static-images
+ * 有全部本地海报。开启时首页榜单/Hero 完全不请求 TMDb，手机直连自己的
+ * 静态资源，天然分散 IP、零配额消耗。改成 false 才走实时榜单刷新。
+ *
+ * 注意：这个开关只管首页。搜索结果的海报由下面的
+ * ENABLE_TMDB_POSTER_FALLBACK 独立控制，两者互不影响。
+ */
+const USE_STATIC_DATA_ONLY = true
 
 // 类型定义
 interface MovieItem {
@@ -81,6 +99,86 @@ declare global {
   }
 }
 
+// ==================== 搜索海报补图：零密钥优先 + 去重 + 并发限流 ====================
+/**
+ * 云函数 /api/search 用 ac=list，多数采集站不返回 vod_pic，搜索结果的海报
+ * 历史上全靠逐片名调 TMDb /search/multi 补齐。一次搜索几十个片名同时发请求，
+ * 单台手机瞬间打满 TMDB 的 per-IP 速率/并发限制 —— 这才是"图片会挂"的根因。
+ *
+ * 三层收敛：
+ *   1. 优先命中本地静态海报（片名 → /static-images/），零外部请求；
+ *   2. 同一片名只查一次，失败也缓存，避免反复重试；
+ *   3. 全局最多 3 个并发，把几十并发压成排队。
+ * 请求仍从用户浏览器直发，出口 IP 天然分散，密钥只在发请求瞬间由份额还原。
+ */
+const ENABLE_TMDB_POSTER_FALLBACK = true
+const POSTER_MAX_CONCURRENT = 3
+
+const isBadPic = (p?: string) => !p || /mac_default|nopic|undefined/i.test(p)
+
+// 从 static-data.json 构建的「片名 → 本地海报」索引
+const staticPosterByName = new Map<string, string>()
+const posterCache = new Map<string, string | null>()
+const posterPending = new Map<string, Promise<string | null>>()
+let posterActive = 0
+const posterWaiters: Array<() => void> = []
+
+function acquirePosterSlot(): Promise<void> {
+  if (posterActive < POSTER_MAX_CONCURRENT) {
+    posterActive++
+    return Promise.resolve()
+  }
+  return new Promise(resolve => posterWaiters.push(resolve))
+}
+
+function releasePosterSlot() {
+  const next = posterWaiters.shift()
+  if (next) next()          // 槽位直接转交给等待者，活跃数保持不变
+  else posterActive--
+}
+
+function cleanTitle(name: string): string {
+  return name
+    .replace(/第[0-9一二三四五六七八九十]+[季部]/g, '')
+    .replace(/Season\s*\d+/ig, '')
+    .replace(/S\d{1,2}/ig, '')
+    .replace(/(HD|BD|1080P|720P|4K|202\d|TC|TS).*/i, '')
+    .trim()
+}
+
+async function lookupPoster(name: string): Promise<string | null> {
+  const local = staticPosterByName.get(name)
+  if (local) return local                        // 命中本地海报，一次请求都不发
+  if (posterCache.has(name)) return posterCache.get(name) ?? null
+  const running = posterPending.get(name)
+  if (running) return running                    // 同一片名只查一次
+
+  const task = (async () => {
+    await acquirePosterSlot()
+    try {
+      const res = await fetch(buildTmdbUrl('/search/multi', {
+        query: cleanTitle(name), language: 'zh-CN'
+      }))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const results: MovieItem[] = data.results || []
+      const found = results.find(i => i.poster_path) || results[0]
+      const url = found?.poster_path ? `${TMDB_IMG_URL}${found.poster_path}` : null
+      posterCache.set(name, url)
+      return url
+    } catch {
+      posterCache.set(name, null)                // 失败也记住，避免每次搜索重试
+      return null
+    } finally {
+      releasePosterSlot()
+      posterPending.delete(name)
+    }
+  })()
+
+  posterPending.set(name, task)
+  return task
+}
+
 // 主内容组件（需要 Suspense 包裹）
 function JilaotvContent() {
   // 路由管理
@@ -109,20 +207,15 @@ function JilaotvContent() {
   const [currentUrl, setCurrentUrl] = useState('')
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [imageMap, setImageMap] = useState<Record<string, string>>({})
-  const [fallbackMap, setFallbackMap] = useState<Record<string, boolean>>({})
   const [isDark, setIsDark] = useState(true) // 黑暗模式状态
   const dplayerRef = useRef<{ destroy: () => void } | null>(null)
   
   // 用于防止重复触发 popstate
   const isInternalNavigation = useRef(false)
 
-  const TMDB_API_KEY = 'c36cafd8b15f8b30f416867cfef1b01d'
-  const MY_PROXY = 'https://daili.smdhb.com'
-  const TMDB_BASE_URL = `${MY_PROXY}/3`
-  const TMDB_IMG_URL = `${MY_PROXY}/t/p/w500`
-  const TMDB_BACKDROP_URL = `${MY_PROXY}/t/p/original`
-
-  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+  // 密钥常量已移除。需要请求 TMDb 时，buildTmdbUrl 会在调用瞬间
+  // 由 src/lib/tmdb/share-a.ts 与 share-b.ts 两份份额相互计算还原。
+  // 不要把任何 TMDb URL 打印到控制台：URL 中含 api_key。
 
   // 检测精简版模式
   useEffect(() => {
@@ -169,16 +262,19 @@ function JilaotvContent() {
   // 获取所有榜单数据
   const fetchAllLists = useCallback(async () => {
     console.log('🚀 [开始获取榜单数据]')
-    console.log('📡 TMDb API URL:', TMDB_BASE_URL)
-    
+
     try {
       console.log('⏳ 正在请求 4 个榜单...')
-      
+
       const [movieRes, tvRes, cnRes, krjpRes] = await Promise.all([
-        fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
-        fetch(`${TMDB_BASE_URL}/trending/tv/week?api_key=${TMDB_API_KEY}&language=zh-CN`),
-        fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=CN&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`),
-        fetch(`${TMDB_BASE_URL}/discover/tv?with_origin_country=KR|JP&sort_by=popularity.desc&api_key=${TMDB_API_KEY}&language=zh-CN`)
+        fetch(buildTmdbUrl('/trending/movie/week', { language: 'zh-CN' })),
+        fetch(buildTmdbUrl('/trending/tv/week', { language: 'zh-CN' })),
+        fetch(buildTmdbUrl('/discover/tv', {
+          with_origin_country: 'CN', sort_by: 'popularity.desc', language: 'zh-CN'
+        })),
+        fetch(buildTmdbUrl('/discover/tv', {
+          with_origin_country: 'KR|JP', sort_by: 'popularity.desc', language: 'zh-CN'
+        }))
       ])
       
       console.log('✅ 所有榜单请求完成')
@@ -220,9 +316,8 @@ function JilaotvContent() {
     console.log('🎬 [开始获取 Hero 轮播数据]')
     
     try {
-      const url = `${TMDB_BASE_URL}/trending/all/week?api_key=${TMDB_API_KEY}&language=zh-CN`
-      console.log('📡 请求 URL:', url)
-      
+      // 不要 console.log 这个 url：其中含 api_key
+      const url = buildTmdbUrl('/trending/all/week', { language: 'zh-CN' })
       const res = await fetch(url)
       console.log('✅ Hero 数据请求完成, 状态:', res.status)
       
@@ -270,7 +365,18 @@ function JilaotvContent() {
       if (data.listCn) setListCn(data.listCn)
       if (data.listKrjp) setListKrjp(data.listKrjp)
       if (data.heroList) setHeroList(data.heroList)
-      
+
+      // 建立「片名 → 本地海报」索引：搜索结果命中这些热门片名时零外部请求
+      for (const list of [data.movieList, data.tvList, data.listCn, data.listKrjp]) {
+        const items: MovieItem[] = list || []
+        items.forEach(item => {
+          const name = item.title || item.name
+          if (name && item.poster_path) {
+            staticPosterByName.set(name, toStaticImage(item.poster_path))
+          }
+        })
+      }
+
       console.log('📊 静态数据统计:', {
         电影: data.movieList?.length || 0,
         剧集: data.tvList?.length || 0,
@@ -289,12 +395,33 @@ function JilaotvContent() {
     
     // 先加载静态数据
     loadStaticData().then(() => {
+      if (USE_STATIC_DATA_ONLY) {
+        console.log('✅ 静态数据模式：榜单与 Hero 均来自本地文件，不请求 TMDb')
+        return
+      }
       console.log('📡 静态数据加载完成，开始获取动态数据...')
       // 然后异步获取动态数据
       fetchAllLists()
       fetchHero()
     })
   }, [loadStaticData, fetchAllLists, fetchHero])
+
+  // 搜索结果补图：统一在 effect 里发起，避免在 render 期间触发 setState。
+  // 只处理确实缺图的片名；lookupPoster 内部会做本地命中、去重和并发限流。
+  useEffect(() => {
+    if (!ENABLE_TMDB_POSTER_FALLBACK || rawList.length === 0) return
+    const names = Array.from(new Set(
+      rawList.filter(item => isBadPic(item.vod_pic)).map(item => item.vod_name)
+    ))
+    let cancelled = false
+    names.forEach(async name => {
+      const url = await lookupPoster(name)
+      if (!cancelled && url) {
+        setImageMap(prev => (prev[name] === url ? prev : { ...prev, [name]: url }))
+      }
+    })
+    return () => { cancelled = true }
+  }, [rawList])
 
   // 从 URL 参数恢复状态
   useEffect(() => {
@@ -508,22 +635,12 @@ function JilaotvContent() {
       }
       
       setRawList(data.list || [])
-      
-      // 处理图片 fallback
-      const needFallback = data.list?.filter((item: SearchResult) => 
-        !item.vod_pic || item.vod_pic.includes('mac_default')
-      ) || []
-      
-      if (needFallback.length > 0) {
-        console.log('🖼️ 需要图片 Fallback:', needFallback.length, '条')
+
+      const missing = (data.list || []).filter((item: SearchResult) => isBadPic(item.vod_pic)).length
+      if (missing > 0) {
+        console.log('🖼️ 缺图结果:', missing, '条，交给补图队列按 3 并发处理')
       }
-      
-      data.list?.forEach((item: SearchResult) => {
-        if (!item.vod_pic || item.vod_pic.includes('mac_default')) {
-          handleImgError(item.vod_name)
-        }
-      })
-      
+
       console.log('✨ 搜索流程全部完成')
       console.log('========================================')
     } catch (error) {
@@ -535,47 +652,6 @@ function JilaotvContent() {
       console.error('========================================')
     } finally {
       setLoading(false)
-    }
-  }
-
-  // 图片错误处理
-  const handleImgError = async (name: string) => {
-    // 如果已经有图片、正在加载中、或者已经 fallback 过，都跳过
-    if (imageMap[name] || loadingMap[name] || fallbackMap[name]) return
-    
-    console.log('🖼️ [图片 Fallback]', name)
-    setLoadingMap(prev => ({ ...prev, [name]: true }))  // 标记为加载中
-    setFallbackMap(prev => ({ ...prev, [name]: true })) // 立即显示 fallback
-    
-    const cleanName = name.replace(/第[0-9一二三四五六七八九十]+[季部]/g, '')
-      .replace(/Season\s*\d+/ig, '')
-      .replace(/S\d{1,2}/ig, '')
-      .replace(/(HD|BD|1080P|720P|4K|202\d|TC|TS).*/i, '')
-      .trim()
-    
-    console.log('🔍 清理后的名称:', cleanName)
-    
-    try {
-      const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&language=zh-CN`
-      const res = await fetch(url)
-      const data = await res.json()
-      
-      if (data.results && data.results.length > 0) {
-        const found = data.results.find((i: MovieItem) => i.poster_path) || data.results[0]
-        if (found.poster_path) {
-          console.log('✅ 找到图片:', found.title || found.name)
-          setImageMap(prev => ({ ...prev, [name]: `${TMDB_IMG_URL}${found.poster_path}` }))
-          setFallbackMap(prev => ({ ...prev, [name]: false })) // 有图才取消 fallback
-        } else {
-          console.warn('⚠️ 未找到图片')
-        }
-      } else {
-        console.warn('⚠️ TMDb 未找到结果')
-      }
-    } catch (error) {
-      console.error('❌ 图片 Fallback 失败:', error)
-    } finally {
-      setLoadingMap(prev => ({ ...prev, [name]: false }))
     }
   }
 
@@ -614,14 +690,10 @@ function JilaotvContent() {
         groups[name] = { name, pic: item.vod_pic, sources: [] }
       }
       
-      const isDefault = (url: string | undefined) => !url || url?.includes('mac_default') || url?.includes('nopic')
-      if (isDefault(groups[name].pic) && !isDefault(item.vod_pic)) {
+      if (isBadPic(groups[name].pic) && !isBadPic(item.vod_pic)) {
         groups[name].pic = item.vod_pic
       }
-      if (isDefault(groups[name].pic)) {
-        handleImgError(name)
-      }
-      
+
       groups[name].sources.push({
         site_name: item.site_name,
         site_key: item.site_key,
@@ -799,10 +871,22 @@ function JilaotvContent() {
         data-section={item.backdrop_path ? 'hero' : ''}
       >
         <div className="poster-wrap">
-          <img 
-            src={`https://daili.smdhb.com/t/p/w300${item.poster_path}`} 
+          <img
+            src={toStaticImage(item.poster_path)}
             alt={name}
             loading="lazy"
+            onError={(e) => {
+              const img = e.currentTarget
+              // 本地海报 -> 代理图片 -> 本地占位图，避免无限触发
+              if (img.dataset.fallback === '2') return
+              if (img.dataset.fallback === '1') {
+                img.dataset.fallback = '2'
+                img.src = '/static-images/jilaoTV.jpg'
+              } else {
+                img.dataset.fallback = '1'
+                img.src = `${TMDB_POSTER_SMALL}${item.poster_path}`
+              }
+            }}
           />
           <div className="rating-badge">
             <Star className="w-3 h-3 text-warning fill-warning mr-1" />
@@ -817,23 +901,25 @@ function JilaotvContent() {
 
   // ResultCard 组件
   const ResultCard = ({ group }: { group: Group }) => {
-    // 优先使用 imageMap 中的图片，其次用原始图片，都没有则用占位图
-    const posterSrc = imageMap[group.name] || group.pic || '/static-images/jilaoTV.jpg'
-    // 判断是否是占位图
+    // 补图结果 > 采集站原图 > 本地占位图。缺图的补图请求由 rawList effect
+    // 统一排队发起，这里只负责加载失败时换占位图，不再重复触发请求。
+    const rawPic = imageMap[group.name] || group.pic
+    const posterSrc = isBadPic(rawPic) ? '/static-images/jilaoTV.jpg' : rawPic
     const isPlaceholder = posterSrc === '/static-images/jilaoTV.jpg'
-    
+
     return (
       <div className="result-card" onClick={() => openDetail(group)}>
         <div className="poster-wrap">
-          <img 
-            src={posterSrc} 
+          <img
+            src={posterSrc}
             alt={group.name}
             referrerPolicy="no-referrer"
-            onError={() => {
-              // 只有非占位图才触发搜索
-              if (!isPlaceholder) {
-                handleImgError(group.name)
-              }
+            onError={(e) => {
+              if (isPlaceholder) return
+              const img = e.currentTarget
+              if (img.dataset.fallback === '1') return
+              img.dataset.fallback = '1'
+              img.src = '/static-images/jilaoTV.jpg'
             }}
             loading="lazy"
           />

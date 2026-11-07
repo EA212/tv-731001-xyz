@@ -50,3 +50,6 @@ next-env.d.ts
 /node_modules
 package-lock.json
 db.json
+
+# WorkBuddy 本地工作记忆（含内部分析，不入库）
+/.workbuddy/

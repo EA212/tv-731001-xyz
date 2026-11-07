@@ -6,8 +6,11 @@
     "dev": "next dev --turbopack",
     "prebuild": "node scripts/generate-version.js",
     "build": "next build",
+    "postbuild": "node scripts/verify-key-absence.js",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "key:rotate": "node scripts/generate-key-shares.js",
+    "key:verify": "node scripts/verify-key-absence.js"
   },
   "dependencies": {
     "animate.css": "^4.1.1",
