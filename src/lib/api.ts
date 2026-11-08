@@ -3,8 +3,12 @@
  * 组件卸载或请求被取代时调用 abort()，杜绝竞态与卸载后 setState。
  */
 
-export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(url, { signal })
+export async function fetchJson<T>(
+  url: string,
+  signal?: AbortSignal,
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(url, { ...init, signal })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return (await res.json()) as T
 }

@@ -5,16 +5,19 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Search, Play, Info, X, Tv, Loader2, Sun, Moon } from 'lucide-react'
+import { Search, Play, Info, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
+import { useSwipe } from '../../lib/use-swipe'
+import type { CuratedFilm } from '../../lib/curate'
 import type {
   StaticData, SearchResult, Group, Source, Episode, DPlayerInstance
 } from '../../lib/types'
 
 const LiteView = dynamic(() => import('./lite'), { ssr: false })
+const SpaceView = dynamic(() => import('./space'), { ssr: false })
 
 const ENABLE_TMDB_POSTER_FALLBACK = true
 const HERO_INTERVAL = 6_000
@@ -50,8 +53,11 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   // URL 是唯一状态源：搜索、刷新恢复、浏览器前进/后退都由它驱动。
   const q = searchParams.get('q') ?? ''
   const d = searchParams.get('d') ?? ''
+  const spaceOpen = searchParams.get('space') === '1'
+  const topic = searchParams.get('topic') ?? ''
   const searched = q.length > 0
 
+  const [spaceLoaded, setSpaceLoaded] = useState(false)
   const [keyword, setKeyword] = useState(q)
   const [rawList, setRawList] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -78,6 +84,13 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   useEffect(() => {
     document.documentElement.dataset.theme = isDark ? 'dark' : 'light'
   }, [isDark])
+
+  // 空间首次进入才加载 chunk；之后保留实例，退出有滑出动画、回来仍保留上次的影展。
+  useEffect(() => { if (spaceOpen) setSpaceLoaded(true) }, [spaceOpen])
+  useEffect(() => {
+    document.body.style.overflow = spaceOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [spaceOpen])
 
   // ---- 滚动：rAF 节流 + passive，且只存布尔阈值 ----
   useEffect(() => {
@@ -193,15 +206,27 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     speedAbort.current?.abort()
   }, [])
 
-  // ---- 操作：只改 URL，不直接发请求 ----
+  // ---- 操作：URL 是唯一状态源，所有跳转基于当前参数增删，不丢 space/topic/q/d ----
+  const updateParams = useCallback((mutate: (p: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString())
+    mutate(params)
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [searchParams, pathname, router])
+
   const doSearch = useCallback((value: string) => {
     const kw = value.trim()
-    if (kw) router.push(`${pathname}?q=${encodeURIComponent(kw)}`, { scroll: false })
-  }, [pathname, router])
+    if (kw) updateParams(p => {
+      p.set('q', kw)
+      p.delete('d')
+      p.delete('space')
+      p.delete('topic')
+    })
+  }, [updateParams])
 
   const clearSearch = useCallback(() => {
-    router.push(pathname, { scroll: false })
-  }, [pathname, router])
+    updateParams(p => { p.delete('q'); p.delete('d') })
+  }, [updateParams])
 
   const autoSearch = useCallback((name: string) => {
     doSearch(name)
@@ -209,6 +234,24 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       document.getElementById('search-result-anchor')?.scrollIntoView({ behavior: 'smooth' })
     })
   }, [doSearch])
+
+  const openSpace = useCallback(() => updateParams(p => p.set('space', '1')), [updateParams])
+  const closeSpace = useCallback(() => updateParams(p => {
+    p.delete('space'); p.delete('topic'); p.delete('d')
+  }), [updateParams])
+  const setSpaceTopic = useCallback((value: string) => updateParams(p => {
+    p.set('space', '1'); p.set('topic', value)
+  }), [updateParams])
+
+  /** 空间里点片：检索脚本没拿到线路时才退回主界面搜索。 */
+  const playFromSpace = useCallback((name: string) => {
+    updateParams(p => { p.set('q', name); p.delete('space'); p.delete('topic') })
+    requestAnimationFrame(() => {
+      document.getElementById('search-result-anchor')?.scrollIntoView({ behavior: 'smooth' })
+    })
+  }, [updateParams])
+
+  useSwipe({ onSwipeRight: openSpace, enabled: !spaceOpen && !showDetail })
 
   // ---- 线路 / 剧集：统一 abort + 一次 setState ----
   const switchSource = useCallback(async (source: Source) => {
@@ -237,10 +280,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const openDetail = useCallback((group: Group) => {
     setCurrentGroup(group)
     setShowDetail(true)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    params.set('d', group.name)
-    router.push(`${pathname}?${params}`, { scroll: false })
+    updateParams(p => p.set('d', group.name))
 
     speedAbort.current?.abort()
     const ctrl = new AbortController()
@@ -264,14 +304,18 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     })
 
     if (group.sources[0]) switchSource(group.sources[0])
-  }, [q, pathname, router, switchSource])
+  }, [updateParams, switchSource])
 
   const closeDetail = useCallback(() => {
     setShowDetail(false)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    router.push(`${pathname}?${params}`, { scroll: false })
-  }, [q, pathname, router])
+    updateParams(p => p.delete('d'))
+  }, [updateParams])
+
+  /** 有真实线路就直接在空间里播放，播放器浮层盖在空间之上，关闭后回到影展。 */
+  const selectFromSpace = useCallback((film: CuratedFilm) => {
+    if (film.sources.length === 0) playFromSpace(film.name)
+    else openDetail({ name: film.name, pic: film.pic, sources: film.sources })
+  }, [openDetail, playFromSpace])
 
   const castVideo = useCallback(() => {
     const video = document.querySelector<HTMLVideoElement & {
@@ -296,14 +340,19 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
           <img src="/logo.png" alt="机佬TV" className="brand-logo" />
           <span className="brand-tag">MAX</span>
         </div>
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={() => setIsDark(v => !v)}
-          aria-label="切换主题"
-        >
-          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </button>
+        <div className="nav-actions">
+          <button type="button" className="space-entry" onClick={openSpace}>
+            <Sparkles className="w-4 h-4" /> AI 策展空间 <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setIsDark(v => !v)}
+            aria-label="切换主题"
+          >
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        </div>
       </nav>
 
       {/* Hero 轮播 */}
@@ -345,6 +394,10 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
             placeholder="输入片名、剧集、演员..."
           />
         </div>
+      </div>
+
+      <div className="swipe-hint" aria-hidden="true">
+        <ChevronRight className="w-4 h-4" /> 右滑进入 AI 策展空间
       </div>
 
       {/* 榜单 */}
@@ -447,6 +500,16 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
           </div>
         )}
       </div>
+
+      {spaceLoaded && (
+        <SpaceView
+          open={spaceOpen}
+          topic={topic}
+          onClose={closeSpace}
+          onTopic={setSpaceTopic}
+          onSelect={selectFromSpace}
+        />
+      )}
     </div>
   )
 }

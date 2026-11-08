@@ -1,7 +1,8 @@
 {
   "cloudFunctions": {
     "nodejs": {
-      "externalNodeModules": ["axios"]
+      "externalNodeModules": ["axios", "openai"],
+      "maxDuration": 60
     }
   }
 }
