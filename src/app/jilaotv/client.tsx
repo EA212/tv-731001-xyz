@@ -10,7 +10,6 @@ import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
-import { useSwipe } from '../../lib/use-swipe'
 import type { CuratedFilm } from '../../lib/curate'
 import type {
   StaticData, SearchResult, Group, Source, Episode, DPlayerInstance
@@ -243,16 +242,6 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     p.set('space', '1'); p.set('topic', value)
   }), [updateParams])
 
-  /** 空间里点片：检索脚本没拿到线路时才退回主界面搜索。 */
-  const playFromSpace = useCallback((name: string) => {
-    updateParams(p => { p.set('q', name); p.delete('space'); p.delete('topic') })
-    requestAnimationFrame(() => {
-      document.getElementById('search-result-anchor')?.scrollIntoView({ behavior: 'smooth' })
-    })
-  }, [updateParams])
-
-  useSwipe({ onSwipeRight: openSpace, enabled: !spaceOpen && !showDetail })
-
   // ---- 线路 / 剧集：统一 abort + 一次 setState ----
   const switchSource = useCallback(async (source: Source) => {
     detailAbort.current?.abort()
@@ -311,11 +300,33 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     updateParams(p => p.delete('d'))
   }, [updateParams])
 
-  /** 有真实线路就直接在空间里播放，播放器浮层盖在空间之上，关闭后回到影展。 */
-  const selectFromSpace = useCallback((film: CuratedFilm) => {
-    if (film.sources.length === 0) playFromSpace(film.name)
-    else openDetail({ name: film.name, pic: film.pic, sources: film.sources })
-  }, [openDetail, playFromSpace])
+  /** 空间点片：有线路直接播；没有线路就在详情层里按片名解析，绝不把人踢回搜索框。 */
+  const openFilm = useCallback(async (film: CuratedFilm) => {
+    if (film.sources.length > 0) {
+      openDetail({ name: film.name, pic: film.pic, sources: film.sources })
+      return
+    }
+
+    setCurrentGroup({ name: film.name, pic: film.pic, sources: [] })
+    setShowDetail(true)
+    setLoadingDetail(true)
+    updateParams(p => p.set('d', film.name))
+
+    try {
+      const res = await fetchJson<{ list?: SearchResult[] }>(
+        `/api/search?wd=${encodeURIComponent(film.name)}`
+      )
+      const groups = groupResults(res.list ?? [])
+      const hit = groups.find(g => g.name === film.name) ?? groups[0]
+      if (!hit) return
+      setCurrentGroup(hit)
+      if (hit.sources[0]) await switchSource(hit.sources[0])
+    } catch {
+      /* 保持空线路，详情层给出提示 */
+    } finally {
+      setLoadingDetail(false)
+    }
+  }, [openDetail, switchSource, updateParams])
 
   const castVideo = useCallback(() => {
     const video = document.querySelector<HTMLVideoElement & {
@@ -396,10 +407,6 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
         </div>
       </div>
 
-      <div className="swipe-hint" aria-hidden="true">
-        <ChevronRight className="w-4 h-4" /> 右滑进入 AI 策展空间
-      </div>
-
       {/* 榜单 */}
       {!searched && SECTIONS.map(section => (
         <HotSection
@@ -462,20 +469,26 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
             <div className="controls-area">
               <div className="control-block">
                 <div className="panel-title">切换线路 (真实测速)</div>
-                <div className="source-list">
-                  {currentGroup.sources.map(source => (
-                    <button
-                      type="button"
-                      key={source.site_key}
-                      className={`source-pill ${currentSource?.site_key === source.site_key ? 'active' : ''}`}
-                      onClick={() => switchSource(source)}
-                    >
-                      <span>{source.site_name}</span>
-                      <span className={`latency-dot ${getLatencyClass(source.latency ?? 999)}`} />
-                      <span className="latency-text">{source.latency ?? '…'}ms</span>
-                    </button>
-                  ))}
-                </div>
+                {loadingDetail && currentGroup.sources.length === 0 ? (
+                  <div className="loading-row"><Loader2 className="spin" /></div>
+                ) : currentGroup.sources.length === 0 ? (
+                  <p className="empty-hint">没有匹配到可播放线路，关闭后换一部试试。</p>
+                ) : (
+                  <div className="source-list">
+                    {currentGroup.sources.map(source => (
+                      <button
+                        type="button"
+                        key={source.site_key}
+                        className={`source-pill ${currentSource?.site_key === source.site_key ? 'active' : ''}`}
+                        onClick={() => switchSource(source)}
+                      >
+                        <span>{source.site_name}</span>
+                        <span className={`latency-dot ${getLatencyClass(source.latency ?? 999)}`} />
+                        <span className="latency-text">{source.latency ?? '…'}ms</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="control-block">
                 <div className="panel-title">选集播放</div>
@@ -507,7 +520,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
           topic={topic}
           onClose={closeSpace}
           onTopic={setSpaceTopic}
-          onSelect={selectFromSpace}
+          onSelect={openFilm}
         />
       )}
     </div>

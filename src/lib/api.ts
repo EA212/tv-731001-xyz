@@ -9,7 +9,10 @@ export async function fetchJson<T>(
   init?: RequestInit
 ): Promise<T> {
   const res = await fetch(url, { ...init, signal })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(body?.error || `HTTP ${res.status}`)
+  }
   return (await res.json()) as T
 }
 
