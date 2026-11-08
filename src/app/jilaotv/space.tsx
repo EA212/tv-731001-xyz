@@ -1,19 +1,19 @@
-/**
- * AI 策展空间：全屏独立层，只负责发现，播放交回主界面播放器。
- * 两态布局——初始居中引导；提交后标题收起，进度与结果紧接其下，避免大标题把内容顶出屏幕。
- */
+/** AI 策展空间：只负责取数与状态，视图交给 space/ 下的组件。 */
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
-import { ArrowLeft, Sparkles, Wand2, RefreshCw, Loader2 } from 'lucide-react'
-import { CuratedCard } from '../../components/CuratedCard'
-import { fetchCurated, clearCurateCache, topicHue } from '../../lib/curate'
+import type { CSSProperties } from 'react'
+import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react'
+import { SearchBar } from '../../components/space/SearchBar'
+import { SkeletonGrid, StageProgress } from '../../components/space/StageProgress'
+import { Gallery } from '../../components/space/Gallery'
+import { accentFrom, clearCurateCache, fetchCurated, topicHue } from '../../lib/curate'
 import type { CuratedFilm, CuratedSpace } from '../../lib/curate'
 import { isBadPic, lookupPoster } from '../../lib/poster'
+import s from '../../components/space/space.module.css'
 
 const PRESETS = ['克里斯托弗·诺兰', '宫崎骏', '赛博朋克', '悬疑烧脑', '治愈系', '王家卫']
-const STAGES = ['正在理解主题', '正在检索片源', '正在补齐海报与线路']
+const STAGES = ['正在品味这个主题', '正在翻找片源', '正在布置放映厅']
 
 interface Props {
   open: boolean
@@ -21,20 +21,6 @@ interface Props {
   onClose: () => void
   onTopic: (topic: string) => void
   onSelect: (film: CuratedFilm) => void
-}
-
-function GallerySkeleton() {
-  return (
-    <div className="space-grid" aria-label="正在生成片单">
-      {Array.from({ length: 8 }, (_, i) => (
-        <div className="skeleton-card" key={i}>
-          <div className="skeleton-poster" />
-          <div className="skeleton-text" />
-          <div className="skeleton-text-sm" />
-        </div>
-      ))}
-    </div>
-  )
 }
 
 export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: Props) {
@@ -75,24 +61,21 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
     return () => abortRef.current?.abort()
   }, [topic, load])
 
-  // 已用秒数：给等待一个可见的锚点，而不是无限空白
   useEffect(() => {
     if (!loading) { setElapsed(0); return }
     const start = Date.now()
     setElapsed(0)
-    const id = window.setInterval(
-      () => setElapsed(Math.floor((Date.now() - start) / 1000)),
-      500
-    )
+    const id = window.setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 500)
     return () => window.clearInterval(id)
   }, [loading])
 
-  // 云端没补到图的，用主界面同一套 TMDb 兜底补一次
+  // 云端没补到图的，用主界面同一套图库兜底补一次
   useEffect(() => {
     if (!data || posterHandled.current === data) return
     posterHandled.current = data
-    const missing = data.films.filter(f => isBadPic(f.pic)).map(f => f.name)
+    const missing = data.films.filter(film => isBadPic(film.pic)).map(film => film.name)
     if (!missing.length) return
+
     let cancelled = false
     Promise.all(missing.map(name => lookupPoster(name).catch(() => null))).then(urls => {
       if (cancelled) return
@@ -100,10 +83,12 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
         missing.map((name, i) => [name, urls[i]] as const).filter(([, url]) => Boolean(url))
       )
       if (!patches.size) return
-      setData(prev => prev && ({
+      setData(prev => prev && {
         ...prev,
-        films: prev.films.map(f => (!f.pic && patches.get(f.name) ? { ...f, pic: patches.get(f.name)! } : f))
-      }))
+        films: prev.films.map(film =>
+          !film.pic && patches.get(film.name) ? { ...film, pic: patches.get(film.name)! } : film
+        )
+      })
     })
     return () => { cancelled = true }
   }, [data])
@@ -114,7 +99,7 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
     load(topic, true)
   }, [topic, load])
 
-  /** 同一主题再选一次视为重新生成；换主题才改 URL。 */
+  /** 同一主题再选一次视为换一批；换主题才改 URL。 */
   const choose = useCallback((value: string) => {
     const next = value.trim().slice(0, 40)
     if (!next) return
@@ -122,125 +107,76 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
     else onTopic(next)
   }, [topic, regenerate, onTopic])
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    choose(input)
-  }
-
   const active = Boolean(topic) || loading || Boolean(data) || Boolean(error)
   const stage = elapsed < 4 ? STAGES[0] : elapsed < 12 ? STAGES[1] : STAGES[2]
-  const hue = topicHue(topic || '私人影展')
+  const theme = accentFrom(data?.accent ?? '', topicHue(topic || '私人影展'))
 
   return (
     <div
-      className={`space-layer ${open ? 'open' : ''} ${active ? 'is-active' : ''}`}
-      style={{ '--space-hue': hue } as CSSProperties}
+      className={s.layer}
+      data-testid="space-layer"
+      data-open={open}
+      data-active={active}
+      style={{ '--accent': theme.accent, '--accent-ink': theme.ink } as CSSProperties}
       aria-hidden={!open}
       aria-label="AI 策展空间"
     >
-      <div className="space-ambient" aria-hidden="true" />
+      <div className={s.ambient} aria-hidden />
 
-      <header className="space-topbar">
-        <button type="button" className="space-back" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4" /> 返回主界面
+      <header className={s.topbar}>
+        <button type="button" className={s.back} data-testid="space-back" onClick={onClose}>
+          <ArrowLeft className="w-4 h-4" />
+          <span className={s.backLabel}>返回</span>
         </button>
-        <span className="space-brand"><Sparkles className="w-4 h-4" /> AI 策展空间</span>
-        <span className="space-count">{data ? `${data.films.length} 部` : ''}</span>
+        <span className={s.brand}><Sparkles className="w-4 h-4" /> 策展空间</span>
+        <span className={s.count}>{data ? `${data.films.length} 部` : ''}</span>
       </header>
 
-      <main className="space-main">
-        <section className="space-hero">
-          <div className="space-eyebrow">PRIVATE SCREENING ROOM · 私人放映室</div>
-          <h1 className="space-heading">
+      <main className={s.main}>
+        <section className={s.hero}>
+          <div className={s.eyebrow}>PRIVATE SCREENING ROOM</div>
+          <h1 className={s.heading} data-testid="space-heading">
             {active ? (topic || '私人影展') : <>给一个名字，<br />还你一整座影展。</>}
           </h1>
           {!active && (
-            <p className="space-lead">
-              输入一位导演、一种风格，或某个说不清的念头。AI 列出片名，检索脚本补齐海报与线路，
-              把这一整层空间布置成只属于你的片单。
+            <p className={s.lead}>
+              一位导演、一种风格，或某个说不清的念头。剩下的，交给策展人。
             </p>
           )}
 
-          <form className="space-form" onSubmit={submit}>
-            <Wand2 className="w-5 h-5 shrink-0" aria-hidden />
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              maxLength={40}
-              placeholder="例如：克里斯托弗·诺兰 / 赛博朋克 / 治愈系..."
-              aria-label="导演或主题"
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 spin" /> : '生成影展'}
-            </button>
-          </form>
-
-          {!active && (
-            <div className="space-presets">
-              {PRESETS.map(preset => (
-                <button type="button" key={preset} onClick={() => choose(preset)}>
-                  {preset}
-                </button>
-              ))}
-            </div>
-          )}
+          <SearchBar
+            value={input}
+            loading={loading}
+            presets={PRESETS}
+            onChange={setInput}
+            onSubmit={() => choose(input)}
+            onPick={choose}
+          />
         </section>
 
         {loading && (
           <>
-            <section className="space-progress" aria-live="polite">
-              <div className="space-progress-head">
-                <Loader2 className="spin" />
-                <span>{stage}…</span>
-                <span className="space-elapsed">{elapsed}s</span>
-              </div>
-              <div className="space-progress-bar">
-                <span style={{ width: `${Math.min(94, 10 + elapsed * 6)}%` }} />
-              </div>
-              <p className="space-progress-hint">
-                AI 先列出片名，再逐部补齐海报与播放线路，通常需要 10–25 秒。
-              </p>
-            </section>
-            <GallerySkeleton />
+            <StageProgress stage={stage} elapsed={elapsed} />
+            <SkeletonGrid />
           </>
         )}
 
         {!loading && error && (
-          <div className="space-error">
+          <div className={s.error} data-testid="space-error">
             <p>{error}</p>
-            <button type="button" onClick={regenerate}>
-              <RefreshCw className="w-4 h-4" /> 重试
+            <button type="button" className={s.retry} onClick={regenerate}>
+              <RefreshCw className="w-4 h-4" /> 再试一次
             </button>
           </div>
         )}
 
         {!loading && data && (
-          <section className="space-gallery" key={data.title}>
-            <div className="space-gallery-head">
-              <div>
-                <span className="space-tag">{data.tag}</span>
-                <h2 className="space-title">{data.title}</h2>
-                {data.subtitle && <p className="space-subtitle">{data.subtitle}</p>}
-              </div>
-              <button type="button" className="space-regen" onClick={regenerate}>
-                <RefreshCw className="w-4 h-4" /> 重新生成
-              </button>
-            </div>
-
-            {data.intro && <p className="space-intro-text">{data.intro}</p>}
-
-            <div className="space-grid">
-              {data.films.map((film, i) => (
-                <CuratedCard key={film.name} film={film} index={i} onSelect={onSelect} />
-              ))}
-            </div>
-
-            <div className="space-footnote">
-              <span>{data.ai ? 'AI 策展' : '实时检索'} · 共 {data.films.length} 部</span>
-              <span>点海报直接播放；同一主题 30 分钟内不再调用 AI</span>
-            </div>
-          </section>
+          <Gallery
+            key={`${data.title}-${data.films.length}`}
+            data={data}
+            onSelect={onSelect}
+            onRegenerate={regenerate}
+          />
         )}
       </main>
     </div>

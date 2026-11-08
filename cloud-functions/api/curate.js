@@ -84,9 +84,12 @@ async function searchByKeyword(topic) {
 
   if (!films.length) return null
   return {
+    eyebrow: '',
     title: `关于「${topic}」`,
-    subtitle: '全网实时检索',
+    subtitle: '这片单由实时检索拼成',
     tag: '实时检索',
+    accent: '',
+    layout: 'gallery',
     intro: '',
     films,
     ai: false
@@ -98,15 +101,18 @@ async function searchByKeyword(topic) {
 /** JSON Output 要求 prompt 含 "json" 字样并给出目标结构样例。 */
 function buildPrompt(topic) {
   return [
-    '你是资深电影策展人。用户给出一个导演、类型或主题，请列出他值得看的片名。',
+    '你是资深电影策展人，为给定主题策划一场只属于观众一人的私人影展。',
     '只输出一个 json 对象，不要解释文字、不要 markdown 代码块。',
-    '严格遵循下面的 JSON 样例，键名与结构完全一致：',
-    '{"title":"影展标题(8-16字,有意境)","subtitle":"副标题(10-20字)",',
-    '"tag":"四字主题标签","intro":"50-80字策展导语",',
-    '"films":[{"name":"通用中文片名","year":"年份","note":"15-30字推荐理由"}]}',
-    '要求：films 8-12 部，必须是真实存在、与主题强相关的影视作品，',
-    '片名用最通用的中文译名，不要编造、不要重复，按推荐优先级排列。',
-    '只给片名和文案，不要提供海报地址、链接或播放地址，检索交给下游脚本完成。',
+    '严格遵循下面的结构，键名与类型完全一致：',
+    '{"eyebrow":"英文氛围短句 3-6 词 全大写","title":"影展标题 8-16 字",',
+    '"subtitle":"副标题 10-20 字","tag":"四字标签","accent":"#RRGGBB 主题色",',
+    '"layout":"gallery 或 spotlight","intro":"50-80 字策展导语",',
+    '"films":[{"name":"通用中文片名","year":"年份","note":"15-30 字推荐语"}]}',
+    '要求：films 8-12 部，必须真实存在、与主题强相关，用最通用的中文译名，',
+    '不编造、不重复，按推荐优先级排列。',
+    'accent 要与主题气质相符，且在深色背景上鲜亮可读，不要接近黑色或纯灰。',
+    'layout：有一个明确主角时用 spotlight，群像或主题分散时用 gallery。',
+    '只给片名与文案，不要提供海报、链接或播放地址。',
     `主题：${topic}`
   ].join('\n')
 }
@@ -129,6 +135,7 @@ function parsePlan(raw, topic) {
   if (!Array.isArray(parsed?.films) || parsed.films.length === 0) return null
 
   const seen = new Set()
+  const accent = String(parsed?.accent ?? '').trim()
   const films = parsed.films
     .map(f => ({
       name: text(f?.name, 40),
@@ -147,9 +154,12 @@ function parsePlan(raw, topic) {
 
   if (!films.length) return null
   return {
+    eyebrow: text(parsed.eyebrow, 32),
     title: text(parsed.title, 40) || `${topic} · 私人影展`,
     subtitle: text(parsed.subtitle, 60) || '为你挑选的一份片单',
     tag: text(parsed.tag, 12) || '私人策展',
+    accent: /^#[0-9a-f]{6}$/i.test(accent) ? accent : '',
+    layout: parsed.layout === 'spotlight' ? 'spotlight' : 'gallery',
     intro: text(parsed.intro, 200),
     films,
     ai: true

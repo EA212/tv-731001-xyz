@@ -443,8 +443,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
 
       <footer className="footer">
         <div>机佬TV 改编 爱吃王哥呆阿龟头 原创</div>
-        <div className="footer-sub">Data provided by TMDb &amp; Maccms APIs</div>
-        <div className="footer-sub">版本: {process.env.NEXT_PUBLIC_BUILD_VERSION || '开发版本'}</div>
+        <div className="footer-sub">片源与海报来自公开影视资料库</div>
       </footer>
 
       {/* 播放详情页 */}
@@ -468,7 +467,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
 
             <div className="controls-area">
               <div className="control-block">
-                <div className="panel-title">切换线路 (真实测速)</div>
+                <div className="panel-title">切换线路</div>
                 {loadingDetail && currentGroup.sources.length === 0 ? (
                   <div className="loading-row"><Loader2 className="spin" /></div>
                 ) : currentGroup.sources.length === 0 ? (
