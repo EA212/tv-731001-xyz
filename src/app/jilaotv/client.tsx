@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Search, Play, Info, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight, ChevronDown } from 'lucide-react'
+import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight, ChevronDown } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
@@ -382,9 +382,6 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
                 <div className="hero-btns">
                   <button type="button" className="btn-play" onClick={() => autoSearch(hero.title)}>
                     <Play className="w-5 h-5" /> 播放
-                  </button>
-                  <button type="button" className="btn-info" onClick={() => autoSearch(hero.title)}>
-                    <Info className="w-5 h-5" /> 更多信息
                   </button>
                 </div>
               </div>

@@ -128,7 +128,7 @@ input { font: inherit; }
   overflow: hidden;
 }
 .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn-play, .btn-info {
+.btn-play {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -137,7 +137,6 @@ input { font: inherit; }
   font-weight: 600;
 }
 .btn-play { background: var(--accent); color: #fff; }
-.btn-info { background: color-mix(in srgb, var(--surface-2) 80%, transparent); border: 1px solid var(--border); }
 
 /* ============ 搜索框 ============ */
 .search-section {
