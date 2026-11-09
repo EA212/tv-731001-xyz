@@ -3,7 +3,6 @@ import { useEffect, useRef, type RefObject } from 'react'
 const DRAG = 72   // 触屏续滑距离
 const WHEEL = 240 // 滚轮累积距离
 const IDLE = 480  // 滚轮停顿多久算新的一次手势
-const HOLD = 3000 // 拉满后需保持的时间
 
 /**
  * 翻到头之后继续拉一下就触发，两头共用一套：
@@ -36,7 +35,6 @@ export function usePullToContinue(
     let lastWheel = 0
     let idle = 0
     let frame = 0
-    let timer = 0
 
     const atEdge = start
       ? () => (root ? root.scrollTop : window.scrollY) <= 2
@@ -57,15 +55,8 @@ export function usePullToContinue(
       })
     }
 
-    const disarm = () => {
-      if (timer) clearTimeout(timer)
-      timer = 0
-      hint?.classList.remove('armed')
-    }
-
     const reset = () => {
       pulled = 0
-      disarm()
       paint(0)
     }
 
@@ -75,19 +66,12 @@ export function usePullToContinue(
       handler.current()
     }
 
-    const arm = () => {
-      if (timer) return
-      clearTimeout(idle)
-      paint(1)
-      hint?.classList.add('armed')
-      timer = window.setTimeout(fire, HOLD)
-    }
-
     const onTouchStart = (e: TouchEvent) => {
       locked = false
       touchReady = inRoot(e) && atEdge()
       startY = e.touches[0].clientY
-      reset()
+      pulled = 0
+      paint(0)
     }
 
     const onTouchMove = (e: TouchEvent) => {
@@ -96,8 +80,7 @@ export function usePullToContinue(
       // 到尽头后手指继续往同一方向拉
       pulled = start ? e.touches[0].clientY - startY : startY - e.touches[0].clientY
       if (pulled <= 0) return reset()
-      if (pulled >= DRAG) return arm()
-      disarm()
+      if (pulled >= DRAG) return fire()
       paint(pulled / DRAG)
     }
 
@@ -121,8 +104,7 @@ export function usePullToContinue(
       lastWheel = now
       if (!wheelReady) return
       pulled += delta
-      if (pulled >= WHEEL) return arm()
-      disarm()
+      if (pulled >= WHEEL) return fire()
       paint(pulled / WHEEL)
       clearTimeout(idle)
       idle = window.setTimeout(reset, IDLE)
@@ -141,10 +123,9 @@ export function usePullToContinue(
       window.removeEventListener('touchcancel', onTouchEnd)
       window.removeEventListener('wheel', onWheel)
       clearTimeout(idle)
-      clearTimeout(timer)
       if (frame) cancelAnimationFrame(frame)
       hint?.style.removeProperty('--pull')
-      hint?.classList.remove('pulling', 'armed')
+      hint?.classList.remove('pulling')
     }
   }, [enabled, hintRef, scrollRef, edge])
 }
