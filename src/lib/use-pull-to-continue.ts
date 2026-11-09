@@ -5,21 +5,24 @@ const WHEEL = 240 // 滚轮累积距离
 const IDLE = 480  // 滚轮停顿多久算新的一次手势
 
 /**
- * 页面已经到底后继续上滑（滚轮继续下滚）就进入。
- * 只认「起手时已经在底部」的手势：一路翻到底不会顺手把空间打开，
+ * 滚到底后继续下滑就触发（触屏用手指上滑，滚轮继续下滚）。
+ * 传入 scrollRef 时按该容器判断，不传按整个页面。
+ * 只认「起手时已经在底部」的手势：一路翻到底不会顺手触发，
  * 需要停下来再滑一下，意图更明确。进度写进 --pull，不触发 React 重渲染。
  */
-export function usePullToEnter<T extends HTMLElement>(
-  onEnter: () => void,
+export function usePullToContinue(
+  onTrigger: () => void,
   enabled: boolean,
-  hintRef: RefObject<T | null>
+  hintRef: RefObject<HTMLElement | null>,
+  scrollRef?: RefObject<HTMLElement | null>
 ) {
-  const handler = useRef(onEnter)
-  useEffect(() => { handler.current = onEnter }, [onEnter])
+  const handler = useRef(onTrigger)
+  useEffect(() => { handler.current = onTrigger }, [onTrigger])
 
   useEffect(() => {
     if (!enabled) return
     const hint = hintRef.current
+    const root = scrollRef?.current ?? null
     let startY = 0
     let pulled = 0
     let locked = false
@@ -30,7 +33,9 @@ export function usePullToEnter<T extends HTMLElement>(
     let frame = 0
 
     const atBottom = () =>
-      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+      root
+        ? root.scrollTop + root.clientHeight >= root.scrollHeight - 2
+        : window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
 
     const paint = (progress: number) => {
       if (!hint) return
@@ -85,7 +90,7 @@ export function usePullToEnter<T extends HTMLElement>(
         wheelReady = false
         return reset()
       }
-      // 停顿过再滚才算新的一次；连续滚到底不会顺势进入
+      // 停顿过再滚才算新的一次；连续滚到底不会顺势触发
       if (now - lastWheel > IDLE) wheelReady = true
       lastWheel = now
       if (!wheelReady) return
@@ -113,5 +118,5 @@ export function usePullToEnter<T extends HTMLElement>(
       hint?.style.removeProperty('--pull')
       hint?.classList.remove('pulling')
     }
-  }, [enabled, hintRef])
+  }, [enabled, hintRef, scrollRef])
 }

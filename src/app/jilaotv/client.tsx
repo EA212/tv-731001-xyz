@@ -10,7 +10,7 @@ import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
-import { usePullToEnter } from '../../lib/use-pull-to-enter'
+import { usePullToContinue } from '../../lib/use-pull-to-continue'
 import type { CuratedFilm } from '../../lib/curate'
 import type {
   StaticData, SearchResult, Group, Source, Episode, DPlayerInstance
@@ -237,7 +237,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   }, [doSearch])
 
   const openSpace = useCallback(() => updateParams(p => p.set('space', '1')), [updateParams])
-  usePullToEnter(openSpace, !spaceOpen && !showDetail, pullHint)
+  usePullToContinue(openSpace, !spaceOpen && !showDetail, pullHint)
   const closeSpace = useCallback(() => updateParams(p => {
     p.delete('space'); p.delete('topic'); p.delete('d')
   }), [updateParams])

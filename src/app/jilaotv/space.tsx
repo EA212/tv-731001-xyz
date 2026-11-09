@@ -3,12 +3,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
 import { SearchBar } from '../../components/space/SearchBar'
 import { SkeletonGrid, StageProgress } from '../../components/space/StageProgress'
 import { Gallery } from '../../components/space/Gallery'
 import { accentFrom, clearCurateCache, fetchCurated, topicHue } from '../../lib/curate'
 import type { CuratedFilm, CuratedSpace } from '../../lib/curate'
+import { usePullToContinue } from '../../lib/use-pull-to-continue'
 import { isBadPic, lookupPoster } from '../../lib/poster'
 import s from '../../components/space/space.module.css'
 
@@ -31,6 +32,11 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
   const [elapsed, setElapsed] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
   const posterHandled = useRef<CuratedSpace | null>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
+  const pullHint = useRef<HTMLDivElement>(null)
+
+  // 与首页同一个手势：滚到底再滑一下，就退回首页
+  usePullToContinue(onClose, open, pullHint, layerRef)
 
   const load = useCallback((value: string, force = false) => {
     abortRef.current?.abort()
@@ -114,6 +120,7 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
   return (
     <div
       className={s.layer}
+      ref={layerRef}
       data-testid="space-layer"
       data-open={open}
       data-active={active}
@@ -179,6 +186,13 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
           />
         )}
       </main>
+
+      <div className="pull-hint" ref={pullHint}>
+        <span className="pull-hint-text">
+          <ChevronDown className="w-4 h-4" /> 继续下滑，回到首页
+        </span>
+        <span className="pull-hint-bar"><span /></span>
+      </div>
     </div>
   )
 }
