@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowLeft, ChevronUp, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
 import { SearchBar } from '../../components/space/SearchBar'
 import { SkeletonGrid, StageProgress } from '../../components/space/StageProgress'
 import { Gallery } from '../../components/space/Gallery'
@@ -35,8 +35,8 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
   const layerRef = useRef<HTMLDivElement>(null)
   const pullHint = useRef<HTMLDivElement>(null)
 
-  // 与首页同一个手势：滚到最底部，继续上滑就退回首页
-  usePullToContinue(onClose, open, pullHint, layerRef)
+  // 与首页同一个手势、相反的一头：在顶部继续下拉就退回首页
+  usePullToContinue(onClose, open, pullHint, layerRef, 'start')
 
   const load = useCallback((value: string, force = false) => {
     abortRef.current?.abort()
@@ -139,6 +139,13 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
         <span className={s.count}>{data ? `${data.films.length} 部` : ''}</span>
       </header>
 
+      <div className="pull-hint pull-hint--top" ref={pullHint}>
+        <span className="pull-hint-text">
+          <ChevronDown className="w-4 h-4" /> 继续下拉，回到首页
+        </span>
+        <span className="pull-hint-bar"><span /></span>
+      </div>
+
       <main className={s.main}>
         <section className={s.hero}>
           <div className={s.eyebrow}>PRIVATE SCREENING ROOM</div>
@@ -186,13 +193,6 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
           />
         )}
       </main>
-
-      <div className="pull-hint" ref={pullHint}>
-        <span className="pull-hint-text">
-          <ChevronUp className="w-4 h-4" /> 继续上滑，回到首页
-        </span>
-        <span className="pull-hint-bar"><span /></span>
-      </div>
     </div>
   )
 }

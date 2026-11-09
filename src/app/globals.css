@@ -359,6 +359,9 @@ input { font: inherit; }
   border-radius: inherit;
   background: var(--accent);
 }
+/* 空间顶部：往下拉返回，文案随下拉向下让一点 */
+.pull-hint--top { padding: 8px 16px 4px; }
+.pull-hint--top .pull-hint-text { transform: translateY(calc(var(--pull) * 6px)); }
 
 /* ============ 骨架屏 ============ */
 .skeleton-hero { height: clamp(420px, 68vh, 720px); background: var(--surface); }
