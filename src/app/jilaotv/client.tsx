@@ -5,11 +5,12 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight, ChevronDown } from 'lucide-react'
+import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
+import { PullHint } from '../../components/PullHint'
 import { usePullToContinue } from '../../lib/use-pull-to-continue'
 import type { CuratedFilm } from '../../lib/curate'
 import type {
@@ -447,12 +448,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       </footer>
 
       {/* 到底再下滑：进入策展空间 */}
-      <div className="pull-hint" ref={pullHint}>
-        <span className="pull-hint-text">
-          <ChevronDown className="w-4 h-4" /> 继续下滑，进入 AI 策展空间
-        </span>
-        <span className="pull-hint-bar"><span /></span>
-      </div>
+      <PullHint side="bottom" hintRef={pullHint} label="继续下滑，进入 AI 策展空间" />
 
       {/* 播放详情页 */}
       <div className={`detail-overlay ${showDetail ? 'active' : ''}`} aria-hidden={!showDetail}>

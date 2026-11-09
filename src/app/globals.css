@@ -321,47 +321,60 @@ input { font: inherit; }
 .footer { text-align: center; padding: 40px var(--page-x) 16px; color: var(--text-dim); font-size: 13px; }
 .footer-sub { margin-top: 6px; font-size: 11px; opacity: 0.65; }
 
-/* ============ 底部下拉入口 ============ */
+/* ============ 边缘续拉提示 ============ */
 .pull-hint {
   --pull: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+  gap: 4px;
+  padding: 10px 0 env(safe-area-inset-bottom);
   color: var(--text-dim);
-  font-size: 12px;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
 }
 .pull-hint-text {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  opacity: calc(0.55 + var(--pull) * 0.45);
-  transform: translateY(calc(var(--pull) * -6px));
+  gap: 5px;
+  opacity: calc(0.6 + var(--pull) * 0.4);
+  transform: translateY(calc(var(--pull) * -3px));
   transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.pull-hint-text svg { width: 14px; height: 14px; }
+.pull-hint-text svg { width: 11px; height: 11px; flex-shrink: 0; }
 .pull-hint.pulling .pull-hint-text { transition: none; }
-.pull-hint-bar {
-  width: 96px;
-  height: 2px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--border);
-}
+/* 不设轨道：静止只是一行小字，拉起来才在页边浮出 1px 主题色 */
+.pull-hint-bar { width: 100%; height: 1px; overflow: hidden; }
 .pull-hint-bar > span {
   display: block;
-  width: calc(var(--pull) * 100%);
+  width: 100%;
   height: 100%;
-  border-radius: inherit;
   background: var(--accent);
+  transform: scaleX(var(--pull));
+  transform-origin: center;
 }
-/* 空间顶部：往下拉返回，文案随下拉向下让一点 */
-.pull-hint--top { padding: 8px 16px 4px; }
-.pull-hint--top .pull-hint-text { transform: translateY(calc(var(--pull) * 6px)); }
+/* 顶部版：细线贴容器上沿，字在线下方 */
+.pull-hint--top {
+  flex-direction: column-reverse;
+  padding: env(safe-area-inset-top) 0 3px;
+}
+.pull-hint--top .pull-hint-text { transform: translateY(calc(var(--pull) * 3px)); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pull-hint:not(.pulling) .pull-hint-text svg { animation: pull-nudge-down 2.6s ease-in-out infinite; }
+  .pull-hint--top:not(.pulling) .pull-hint-text svg { animation-name: pull-nudge-up; }
+}
+@keyframes pull-nudge-down {
+  0%, 100% { transform: translateY(-1px); }
+  50% { transform: translateY(2px); }
+}
+@keyframes pull-nudge-up {
+  0%, 100% { transform: translateY(1px); }
+  50% { transform: translateY(-2px); }
+}
 
 /* ============ 骨架屏 ============ */
 .skeleton-hero { height: clamp(420px, 68vh, 720px); background: var(--surface); }

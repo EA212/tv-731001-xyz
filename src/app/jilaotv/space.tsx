@@ -3,10 +3,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowLeft, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react'
 import { SearchBar } from '../../components/space/SearchBar'
 import { SkeletonGrid, StageProgress } from '../../components/space/StageProgress'
 import { Gallery } from '../../components/space/Gallery'
+import { PullHint } from '../../components/PullHint'
 import { accentFrom, clearCurateCache, fetchCurated, topicHue } from '../../lib/curate'
 import type { CuratedFilm, CuratedSpace } from '../../lib/curate'
 import { usePullToContinue } from '../../lib/use-pull-to-continue'
@@ -130,6 +131,8 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
     >
       <div className={s.ambient} aria-hidden />
 
+      <PullHint side="top" hintRef={pullHint} label="继续下拉，回到首页" />
+
       <header className={s.topbar}>
         <button type="button" className={s.back} data-testid="space-back" onClick={onClose}>
           <ArrowLeft className="w-4 h-4" />
@@ -138,13 +141,6 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
         <span className={s.brand}><Sparkles className="w-4 h-4" /> 策展空间</span>
         <span className={s.count}>{data ? `${data.films.length} 部` : ''}</span>
       </header>
-
-      <div className="pull-hint pull-hint--top" ref={pullHint}>
-        <span className="pull-hint-text">
-          <ChevronDown className="w-4 h-4" /> 继续下拉，回到首页
-        </span>
-        <span className="pull-hint-bar"><span /></span>
-      </div>
 
       <main className={s.main}>
         <section className={s.hero}>
