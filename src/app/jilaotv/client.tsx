@@ -5,11 +5,12 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Search, Play, Info, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 'lucide-react'
+import { Search, Play, Info, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight, ChevronDown } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
+import { usePullToEnter } from '../../lib/use-pull-to-enter'
 import type { CuratedFilm } from '../../lib/curate'
 import type {
   StaticData, SearchResult, Group, Source, Episode, DPlayerInstance
@@ -72,6 +73,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const [currentUrl, setCurrentUrl] = useState('')
   const [loadingDetail, setLoadingDetail] = useState(false)
 
+  const pullHint = useRef<HTMLDivElement>(null)
   const dplayerRef = useRef<DPlayerInstance | null>(null)
   const detailAbort = useRef<AbortController | null>(null)
   const speedAbort = useRef<AbortController | null>(null)
@@ -235,6 +237,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   }, [doSearch])
 
   const openSpace = useCallback(() => updateParams(p => p.set('space', '1')), [updateParams])
+  usePullToEnter(openSpace, !spaceOpen && !showDetail, pullHint)
   const closeSpace = useCallback(() => updateParams(p => {
     p.delete('space'); p.delete('topic'); p.delete('d')
   }), [updateParams])
@@ -445,6 +448,14 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
         <div>机佬TV 改编 爱吃王哥呆阿龟头 原创</div>
         <div className="footer-sub">片源与海报来自公开影视资料库</div>
       </footer>
+
+      {/* 到底再下滑：进入策展空间 */}
+      <div className="pull-hint" ref={pullHint}>
+        <span className="pull-hint-text">
+          <ChevronDown className="w-4 h-4" /> 继续下滑，进入 AI 策展空间
+        </span>
+        <span className="pull-hint-bar"><span /></span>
+      </div>
 
       {/* 播放详情页 */}
       <div className={`detail-overlay ${showDetail ? 'active' : ''}`} aria-hidden={!showDetail}>
