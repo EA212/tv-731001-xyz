@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowLeft, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, ChevronUp, RefreshCw, Sparkles } from 'lucide-react'
 import { SearchBar } from '../../components/space/SearchBar'
 import { SkeletonGrid, StageProgress } from '../../components/space/StageProgress'
 import { Gallery } from '../../components/space/Gallery'
@@ -35,7 +35,7 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
   const layerRef = useRef<HTMLDivElement>(null)
   const pullHint = useRef<HTMLDivElement>(null)
 
-  // 与首页同一个手势：滚到底再滑一下，就退回首页
+  // 与首页同一个手势：滚到最底部，继续上滑就退回首页
   usePullToContinue(onClose, open, pullHint, layerRef)
 
   const load = useCallback((value: string, force = false) => {
@@ -189,7 +189,7 @@ export default function SpaceView({ open, topic, onClose, onTopic, onSelect }: P
 
       <div className="pull-hint" ref={pullHint}>
         <span className="pull-hint-text">
-          <ChevronDown className="w-4 h-4" /> 继续下滑，回到首页
+          <ChevronUp className="w-4 h-4" /> 继续上滑，回到首页
         </span>
         <span className="pull-hint-bar"><span /></span>
       </div>

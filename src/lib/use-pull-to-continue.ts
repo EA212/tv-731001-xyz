@@ -37,6 +37,9 @@ export function usePullToContinue(
         ? root.scrollTop + root.clientHeight >= root.scrollHeight - 2
         : window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
 
+    // 事件必须落在自己的滚动容器里：上层详情浮层的滑动不能带着空间退出
+    const inRoot = (e: Event) => !root || root.contains(e.target as Node)
+
     const paint = (progress: number) => {
       if (!hint) return
       if (frame) cancelAnimationFrame(frame)
@@ -60,14 +63,14 @@ export function usePullToContinue(
 
     const onTouchStart = (e: TouchEvent) => {
       locked = false
-      touchReady = atBottom()
+      touchReady = inRoot(e) && atBottom()
       startY = e.touches[0].clientY
       pulled = 0
       paint(0)
     }
 
     const onTouchMove = (e: TouchEvent) => {
-      if (locked || !touchReady || e.touches.length > 1) return
+      if (locked || !touchReady || e.touches.length > 1 || !inRoot(e)) return
       if (!atBottom()) return reset()
       // 到底后手指继续上滑：内容已到尽头还想往下翻
       pulled = startY - e.touches[0].clientY
@@ -83,7 +86,7 @@ export function usePullToContinue(
     }
 
     const onWheel = (e: WheelEvent) => {
-      if (locked) return
+      if (locked || !inRoot(e)) return
       const now = Date.now()
       if (!atBottom() || e.deltaY <= 0) {
         lastWheel = now
