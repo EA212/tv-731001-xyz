@@ -149,15 +149,30 @@ input { font: inherit; }
 .search-box-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: min(680px, 100%);
-  padding: 10px 18px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
-.search-icon { display: grid; place-items: center; color: var(--text-dim); }
+.search-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.search-btn:hover { opacity: 0.88; }
+.search-btn:active { transform: scale(0.92); }
 .search-input {
   flex: 1;
   min-width: 0;

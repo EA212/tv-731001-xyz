@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { GestureLock } from '../components/GestureLock'
 import { GATE_COOKIE, TTL, issueToken } from '../lib/gate'
 
@@ -55,8 +54,8 @@ function detectDeviceCapability(): boolean {
 }
 
 export default function Home() {
-  const router = useRouter()
   const [target, setTarget] = useState('/jilaotv')
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const lite = detectDeviceCapability()
@@ -64,16 +63,29 @@ export default function Home() {
     setTarget(lite ? '/jilaotv?mode=lite' : '/jilaotv')
   }, [])
 
+  const go = () => window.location.replace(target)
+
   const unlock = async () => {
     const token = await issueToken()
     document.cookie = `${GATE_COOKIE}=${token}; path=/; max-age=${TTL}; SameSite=Lax`
-    router.replace(target)
+    setReady(true)
+    go()
   }
 
   return (
     <main className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
       <h1 className="text-3xl font-semibold text-white tracking-wide mb-12">机佬TV</h1>
-      <GestureLock onUnlock={unlock} />
+      {ready ? (
+        <button
+          type="button"
+          onClick={go}
+          className="px-8 py-3 rounded-full bg-white text-black text-sm font-medium"
+        >
+          进入
+        </button>
+      ) : (
+        <GestureLock onUnlock={unlock} />
+      )}
     </main>
   )
 }

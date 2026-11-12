@@ -394,8 +394,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       {/* 搜索框 */}
       <div className="search-section">
         <div className="search-box-wrapper">
-          <button type="button" className="search-icon" aria-label="搜索" onClick={() => doSearch(keyword)}>
-            <Search className="w-6 h-6" />
+          <button type="button" className="search-btn" aria-label="搜索" onClick={() => doSearch(keyword)}>
+            <Search className="w-5 h-5" />
           </button>
           <input
             type="search"
