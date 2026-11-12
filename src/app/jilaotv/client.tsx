@@ -65,7 +65,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const share = useMemo(() => readShareTarget(new URLSearchParams(paramsString)), [paramsString])
   // 仅捕获首屏 URL：用户交互写入的 sid 不触发还原，避免与 openDetail 打架。
   const [bootShare] = useState(() => readShareTarget(new URLSearchParams(paramsString)))
-  const spaceOpen = searchParams.get('space') === '1' && !share
+  // 空间与详情正交：space=1 即空间在场，详情由 d 叠加在上层（z-index 更高），互不否决。
+  const spaceOpen = searchParams.get('space') === '1'
 
   const [spaceLoaded, setSpaceLoaded] = useState(false)
   const [keyword, setKeyword] = useState(q)
@@ -395,7 +396,11 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       const hit = groups.find(g => g.name === film.name) ?? groups[0]
       if (!hit) return
       setCurrentGroup(hit)
-      if (hit.sources[0]) await switchSource(hit.sources[0])
+      if (hit.sources[0]) {
+        // 补到真实线路即回写 sid/sn，保证此刻的 URL 可分享、可定位（space/topic 保持不变）。
+        updateParams(p => applyShareParams(p, hit.name, hit.sources[0]))
+        await switchSource(hit.sources[0])
+      }
     } catch {
       /* 保持空线路，详情层给出提示 */
     } finally {
