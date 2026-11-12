@@ -9,6 +9,8 @@ import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 
 import { fetchJson, loadScript } from '../../lib/api'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
+import { applyShareParams, clearShareParams, readShareTarget } from '../../lib/deeplink'
+import type { ShareTarget } from '../../lib/deeplink'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
 import { PullHint } from '../../components/PullHint'
 import { usePullToContinue } from '../../lib/use-pull-to-continue'
@@ -54,9 +56,15 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   // URL 是唯一状态源：搜索、刷新恢复、浏览器前进/后退都由它驱动。
   const q = searchParams.get('q') ?? ''
   const d = searchParams.get('d') ?? ''
-  const spaceOpen = searchParams.get('space') === '1'
   const topic = searchParams.get('topic') ?? ''
   const searched = q.length > 0
+
+  // 分享落地：URL 只带定位线索（d/sid/sn），不含任何列表或播放数据。
+  const paramsString = searchParams.toString()
+  const share = useMemo(() => readShareTarget(new URLSearchParams(paramsString)), [paramsString])
+  // 仅捕获首屏 URL：用户交互写入的 sid 不触发还原，避免与 openDetail 打架。
+  const [bootShare] = useState(() => readShareTarget(new URLSearchParams(paramsString)))
+  const spaceOpen = searchParams.get('space') === '1' && !share
 
   const [spaceLoaded, setSpaceLoaded] = useState(false)
   const [keyword, setKeyword] = useState(q)
@@ -123,9 +131,15 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     return () => window.clearInterval(id)
   }, [heroList.length])
 
-  // ---- 搜索：q 变化即请求；abort 旧请求，杜绝竞态 ----
+  // ---- 搜索：q 变化即请求；分享直达时让路，绝不重跑全量搜索 ----
   useEffect(() => {
     setKeyword(q)
+    if (share) {
+      setRawList([])
+      setImageMap({})
+      setLoading(false)
+      return
+    }
     if (!q) {
       setRawList([])
       setImageMap({})
@@ -141,7 +155,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       .catch(err => { if (!ctrl.signal.aborted) console.error('搜索失败', err) })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
     return () => ctrl.abort()
-  }, [q])
+  }, [q, share])
 
   // ---- 缺图补图：并发拉取，一次批量写入 state ----
   useEffect(() => {
@@ -220,14 +234,14 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     const kw = value.trim()
     if (kw) updateParams(p => {
       p.set('q', kw)
-      p.delete('d')
+      clearShareParams(p)
       p.delete('space')
       p.delete('topic')
     })
   }, [updateParams])
 
   const clearSearch = useCallback(() => {
-    updateParams(p => { p.delete('q'); p.delete('d') })
+    updateParams(p => { p.delete('q'); clearShareParams(p) })
   }, [updateParams])
 
   const autoSearch = useCallback((name: string) => {
@@ -240,14 +254,14 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const openSpace = useCallback(() => updateParams(p => p.set('space', '1')), [updateParams])
   usePullToContinue(openSpace, !spaceOpen && !showDetail, pullHint)
   const closeSpace = useCallback(() => updateParams(p => {
-    p.delete('space'); p.delete('topic'); p.delete('d')
+    p.delete('space'); p.delete('topic'); clearShareParams(p)
   }), [updateParams])
   const setSpaceTopic = useCallback((value: string) => updateParams(p => {
     p.set('space', '1'); p.set('topic', value)
   }), [updateParams])
 
   // ---- 线路 / 剧集：统一 abort + 一次 setState ----
-  const switchSource = useCallback(async (source: Source) => {
+  const switchSource = useCallback(async (source: Source): Promise<boolean> => {
     detailAbort.current?.abort()
     const ctrl = new AbortController()
     detailAbort.current = ctrl
@@ -259,12 +273,14 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
         `/api/detail?site_key=${encodeURIComponent(source.site_key)}&id=${encodeURIComponent(source.vod_id)}`,
         ctrl.signal
       )
-      if (ctrl.signal.aborted) return
+      if (ctrl.signal.aborted) return false
       const episodes = parseEpisodes(res.list?.[0]?.vod_play_url)
       setEpisodeList(episodes)
       if (episodes[0]) setCurrentUrl(episodes[0].url)
+      return episodes.length > 0
     } catch {
       if (!ctrl.signal.aborted) setEpisodeList([])
+      return false
     } finally {
       if (!ctrl.signal.aborted) setLoadingDetail(false)
     }
@@ -273,7 +289,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const openDetail = useCallback((group: Group) => {
     setCurrentGroup(group)
     setShowDetail(true)
-    updateParams(p => p.set('d', group.name))
+    updateParams(p => applyShareParams(p, group.name, group.sources[0]))
 
     speedAbort.current?.abort()
     const ctrl = new AbortController()
@@ -299,9 +315,44 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     if (group.sources[0]) switchSource(group.sources[0])
   }, [updateParams, switchSource])
 
+  /** 分享落地：定位线索先秒开详情，再用 sid 一次定点查询换当下最新线路。 */
+  const resolveShare = useCallback(async (target: ShareTarget) => {
+    const source: Source = {
+      site_key: target.siteKey,
+      vod_id: target.vodId,
+      site_name: target.siteName || target.siteKey,
+    }
+    setCurrentGroup({ name: target.name, pic: '', sources: [source] })
+    setShowDetail(true)
+    setCurrentSource(source)
+    if (await switchSource(source)) return
+
+    // sid 失效才按精确片名兜底一次；仅同名命中才展开，绝不模糊误播。
+    try {
+      const res = await fetchJson<{ list?: SearchResult[] }>(
+        `/api/search?wd=${encodeURIComponent(target.name)}`
+      )
+      const hit = groupResults(res.list ?? []).find(g => g.name === target.name)
+      if (hit?.sources[0]) {
+        setCurrentGroup(hit)
+        if (await switchSource(hit.sources[0])) return
+      }
+    } catch { /* 落到统一退化 */ }
+
+    // 无可用线路：清掉占位线路，交给现有提示，不误播、不白屏。
+    setCurrentGroup({ name: target.name, pic: '', sources: [] })
+  }, [switchSource])
+
+  const shareResolved = useRef(false)
+  useEffect(() => {
+    if (shareResolved.current || !bootShare) return
+    shareResolved.current = true
+    void resolveShare(bootShare)
+  }, [bootShare, resolveShare])
+
   const closeDetail = useCallback(() => {
     setShowDetail(false)
-    updateParams(p => p.delete('d'))
+    updateParams(clearShareParams)
   }, [updateParams])
 
   /** 空间点片：有线路直接播；没有线路就在详情层里按片名解析，绝不把人踢回搜索框。 */
@@ -314,7 +365,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     setCurrentGroup({ name: film.name, pic: film.pic, sources: [] })
     setShowDetail(true)
     setLoadingDetail(true)
-    updateParams(p => p.set('d', film.name))
+    updateParams(p => applyShareParams(p, film.name))
 
     try {
       const res = await fetchJson<{ list?: SearchResult[] }>(
@@ -484,8 +535,12 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
                         onClick={() => switchSource(source)}
                       >
                         <span>{source.site_name}</span>
-                        <span className={`latency-dot ${getLatencyClass(source.latency ?? 999)}`} />
-                        <span className="latency-text">{source.latency ?? '…'}ms</span>
+                        {source.latency != null && (
+                          <>
+                            <span className={`latency-dot ${getLatencyClass(source.latency)}`} />
+                            <span className="latency-text">{source.latency}ms</span>
+                          </>
+                        )}
                       </button>
                     ))}
                   </div>

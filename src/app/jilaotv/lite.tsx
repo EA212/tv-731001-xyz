@@ -8,6 +8,7 @@ import { groupResults, parseEpisodes } from '../../lib/data'
 import { Poster } from '../../components/Poster'
 import { SECTIONS } from '../../components/Cards'
 import { toStaticImage } from '../../lib/tmdb'
+import { applyShareParams, clearShareParams, readShareTarget } from '../../lib/deeplink'
 import type { StaticData, SearchResult, Group, Episode, MovieItem } from '../../lib/types'
 
 const LiteRow = memo(function LiteRow({
@@ -35,6 +36,9 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
   const searchParams = useSearchParams()
   const q = searchParams.get('q') ?? ''
   const searched = q.length > 0
+  const paramsString = searchParams.toString()
+  const share = useMemo(() => readShareTarget(new URLSearchParams(paramsString)), [paramsString])
+  const [bootShare] = useState(() => readShareTarget(new URLSearchParams(paramsString)))
 
   const [keyword, setKeyword] = useState(q)
   const [rawList, setRawList] = useState<SearchResult[]>([])
@@ -48,6 +52,7 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
 
   useEffect(() => {
     setKeyword(q)
+    if (share) { setRawList([]); setLoading(false); return }
     if (!q) { setRawList([]); setLoading(false); return }
     const ctrl = new AbortController()
     setLoading(true)
@@ -57,31 +62,32 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
       .catch(() => { if (!ctrl.signal.aborted) setRawList([]) })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
     return () => ctrl.abort()
-  }, [q])
+  }, [q, share])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const groups = useMemo(() => groupResults(rawList), [rawList])
 
-  const push = useCallback((params: URLSearchParams) => {
+  const updateParams = useCallback((mutate: (p: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString())
     params.set('mode', 'lite')
+    mutate(params)
     router.push(`${pathname}?${params}`, { scroll: false })
-  }, [pathname, router])
+  }, [searchParams, pathname, router])
 
   const doSearch = useCallback((value: string) => {
     const kw = value.trim()
     if (!kw) return
-    const params = new URLSearchParams()
-    params.set('q', kw)
-    push(params)
-  }, [push])
+    updateParams(p => { clearShareParams(p); p.set('q', kw) })
+  }, [updateParams])
 
   const clearSearch = useCallback(() => {
     setShowDetail(false)
-    push(new URLSearchParams())
-  }, [push])
+    updateParams(p => { clearShareParams(p); p.delete('q') })
+  }, [updateParams])
 
-  const openDetail = useCallback(async (group: Group) => {
+  /** 纯播放：详情点击与分享还原共用，不写 URL。 */
+  const play = useCallback(async (group: Group) => {
     setCurrentGroup(group)
     setShowDetail(true)
     setLoadingDetail(true)
@@ -109,10 +115,32 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
     }
   }, [])
 
+  const openDetail = useCallback((group: Group) => {
+    void play(group)
+    updateParams(p => applyShareParams(p, group.name, group.sources[0]))
+  }, [play, updateParams])
+
+  // 分享落地：首屏带 sid 时直接还原到那一部，不写 URL、不重跑搜索。
+  const shareResolved = useRef(false)
+  useEffect(() => {
+    if (shareResolved.current || !bootShare) return
+    shareResolved.current = true
+    void play({
+      name: bootShare.name,
+      pic: '',
+      sources: [{
+        site_key: bootShare.siteKey,
+        vod_id: bootShare.vodId,
+        site_name: bootShare.siteName || bootShare.siteKey,
+      }],
+    })
+  }, [bootShare, play])
+
   const closeDetail = useCallback(() => {
     setShowDetail(false)
     setCurrentUrl('')
-  }, [])
+    updateParams(clearShareParams)
+  }, [updateParams])
 
   return (
     <div className="lite-shell">

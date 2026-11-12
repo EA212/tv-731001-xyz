@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { GATE_COOKIE, TTL, issueToken, verifyToken } from './lib/gate'
+import { sanitizeNext } from './lib/deeplink'
 
 const UNLOCK_PATH = '/api/unlock'
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
 
   // 解锁端点：密钥只在服务端，签发后以 HttpOnly cookie 下发，前端永远拿不到。
   if (pathname === UNLOCK_PATH) {
@@ -37,20 +38,19 @@ export async function middleware(request: NextRequest) {
   const isGate = pathname === '/'
 
   if (isGate) {
-    if (ok) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/jilaotv'
-      url.search = ''
-      return NextResponse.redirect(url)
-    }
-    return NextResponse.next()
+    if (!ok) return NextResponse.next()
+    // 已解锁：优先跳回分享链接里的原始目标，否则回默认首页。
+    const dest = sanitizeNext(request.nextUrl.searchParams.get('next')) ?? '/jilaotv'
+    return NextResponse.redirect(new URL(dest, request.url))
   }
 
   if (ok) return NextResponse.next()
 
+  // 未解锁：完整 pathname+search 装进 next，解锁后原样跳回，绝不丢参数。
   const url = request.nextUrl.clone()
   url.pathname = '/'
   url.search = ''
+  url.searchParams.set('next', pathname + search)
   return NextResponse.redirect(url)
 }
 

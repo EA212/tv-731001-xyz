@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { GestureLock } from '../components/GestureLock'
+import { sanitizeNext } from '../lib/deeplink'
 
 interface NavigatorWithMemory extends Navigator {
   deviceMemory?: number
@@ -60,7 +61,16 @@ export default function Home() {
   useEffect(() => {
     const lite = detectDeviceCapability()
     localStorage.setItem('jilaotv-mode', lite ? 'lite' : 'normal')
-    setTarget(lite ? '/jilaotv?mode=lite' : '/jilaotv')
+    // 分享链接带回跳目标时原样跳回，并把设备模式一并带上。
+    const next = sanitizeNext(new URLSearchParams(window.location.search).get('next'))
+    const base = next ?? '/jilaotv'
+    if (lite) {
+      const url = new URL(base, window.location.origin)
+      if (!url.searchParams.has('mode')) url.searchParams.set('mode', 'lite')
+      setTarget(url.pathname + url.search)
+    } else {
+      setTarget(base)
+    }
   }, [])
 
   const go = () => window.location.replace(target)
