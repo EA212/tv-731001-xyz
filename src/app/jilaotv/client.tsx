@@ -391,21 +391,19 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
         ) : <div className="skeleton-hero"><div className="skeleton-hero-content" /></div>}
       </section>
 
-      {/* 搜索框 */}
+      {/* 搜索：按钮独立在左，输入框自身是完整胶囊 */}
       <div className="search-section">
-        <div className="search-box-wrapper">
-          <button type="button" className="search-btn" aria-label="搜索" onClick={() => doSearch(keyword)}>
-            <Search className="w-5 h-5" />
-          </button>
-          <input
-            type="search"
-            value={keyword}
-            onChange={e => setKeyword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && doSearch(keyword)}
-            className="search-input"
-            placeholder="输入片名、剧集、演员..."
-          />
-        </div>
+        <button type="button" className="search-btn" aria-label="搜索" onClick={() => doSearch(keyword)}>
+          <Search className="w-5 h-5" />
+        </button>
+        <input
+          type="search"
+          value={keyword}
+          onChange={e => setKeyword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doSearch(keyword)}
+          className="search-input"
+          placeholder="请输入你要查询的内容"
+        />
       </div>
 
       {/* 榜单 */}

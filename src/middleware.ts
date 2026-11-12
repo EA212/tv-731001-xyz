@@ -1,9 +1,40 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { verifyToken } from './lib/gate'
+import { GATE_COOKIE, TTL, issueToken, verifyToken } from './lib/gate'
+
+const UNLOCK_PATH = '/api/unlock'
 
 export async function middleware(request: NextRequest) {
-  const ok = await verifyToken(request.cookies.get('jt')?.value)
-  const isGate = request.nextUrl.pathname === '/'
+  const { pathname } = request.nextUrl
+
+  // 解锁端点：密钥只在服务端，签发后以 HttpOnly cookie 下发，前端永远拿不到。
+  if (pathname === UNLOCK_PATH) {
+    if (request.method !== 'POST') {
+      return new NextResponse(null, { status: 405, headers: { Allow: 'POST' } })
+    }
+    // Fetch Metadata 由浏览器强制附加、脚本无法伪造；缺失时按旧浏览器放行。
+    if (request.headers.get('sec-fetch-site') === 'cross-site') {
+      return new NextResponse(null, { status: 403 })
+    }
+
+    const token = await issueToken()
+    const res = NextResponse.json(
+      { ok: true },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
+    res.cookies.set({
+      name: GATE_COOKIE,
+      value: token,
+      httpOnly: true,
+      secure: request.nextUrl.protocol === 'https:',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: TTL,
+    })
+    return res
+  }
+
+  const ok = await verifyToken(request.cookies.get(GATE_COOKIE)?.value)
+  const isGate = pathname === '/'
 
   if (isGate) {
     if (ok) {
@@ -24,5 +55,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/jilaotv', '/jilaotv/:path*', '/jltv', '/jltv/:path*'],
+  matcher: ['/', '/api/unlock', '/jilaotv', '/jilaotv/:path*', '/jltv', '/jltv/:path*'],
 }

@@ -138,36 +138,27 @@ input { font: inherit; }
 }
 .btn-play { background: var(--accent); color: #fff; }
 
-/* ============ 搜索框 ============ */
+/* ============ 搜索：按钮与输入框相互独立 ============ */
 .search-section {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 14px;
   margin: -28px var(--page-x) 24px;
   position: relative;
   z-index: 2;
 }
-.search-box-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: min(680px, 100%);
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-}
 .search-btn {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
   border: 0;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
-  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(229, 9, 20, 0.3);
   -webkit-tap-highlight-color: transparent;
   transition: opacity 0.2s ease, transform 0.15s ease;
 }
@@ -176,13 +167,22 @@ input { font: inherit; }
 .search-input {
   flex: 1;
   min-width: 0;
-  border: 0;
+  max-width: 680px;
+  height: 52px;
+  padding: 0 22px;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   outline: 0;
-  background: transparent;
+  background: var(--surface);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   color: var(--text);
   font-size: 16px;
 }
 .search-input::placeholder { color: var(--text-dim); }
+.search-input:focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 /* ============ 榜单 ============ */
 .section-container { margin: 0 var(--page-x) 32px; }

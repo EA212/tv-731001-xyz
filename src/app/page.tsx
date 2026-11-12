@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { GestureLock } from '../components/GestureLock'
-import { GATE_COOKIE, TTL, issueToken } from '../lib/gate'
 
 interface NavigatorWithMemory extends Navigator {
   deviceMemory?: number
@@ -56,6 +55,7 @@ function detectDeviceCapability(): boolean {
 export default function Home() {
   const [target, setTarget] = useState('/jilaotv')
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     const lite = detectDeviceCapability()
@@ -65,11 +65,15 @@ export default function Home() {
 
   const go = () => window.location.replace(target)
 
-  const unlock = async () => {
-    const token = await issueToken()
-    document.cookie = `${GATE_COOKIE}=${token}; path=/; max-age=${TTL}; SameSite=Lax`
-    setReady(true)
-    go()
+  const unlock = () => {
+    setError(false)
+    void fetch('/api/unlock', { method: 'POST' })
+      .then(res => {
+        if (!res.ok) throw new Error('unlock failed')
+        setReady(true)
+        go()
+      })
+      .catch(() => setError(true))
   }
 
   return (
@@ -84,7 +88,10 @@ export default function Home() {
           进入
         </button>
       ) : (
-        <GestureLock onUnlock={unlock} />
+        <>
+          <GestureLock onUnlock={unlock} />
+          {error && <p className="mt-2 text-sm text-red-400">解锁失败，请再画一次</p>}
+        </>
       )}
     </main>
   )
