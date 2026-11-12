@@ -20,7 +20,6 @@ import type {
   StaticData, SearchResult, Group, Source, Episode, DPlayerInstance
 } from '../../lib/types'
 
-const LiteView = dynamic(() => import('./lite'), { ssr: false })
 const SpaceView = dynamic(() => import('./space'), { ssr: false })
 
 const ENABLE_TMDB_POSTER_FALLBACK = true
@@ -28,26 +27,6 @@ const HERO_INTERVAL = 6_000
 
 const getLatencyClass = (ms: number) =>
   ms < 500 ? 'dot-green' : ms < 2000 ? 'dot-yellow' : 'dot-red'
-
-/** 模式分流：精简版懒加载，主包里完全不含它的代码。 */
-function ModeRouter({ initialData }: { initialData: StaticData }) {
-  const searchParams = useSearchParams()
-  const fromUrl = searchParams.get('mode') === 'lite'
-  const [lite, setLite] = useState<boolean | null>(fromUrl ? true : null)
-
-  useEffect(() => {
-    if (fromUrl) {
-      localStorage.setItem('jilaotv-mode', 'lite')
-      setLite(true)
-    } else {
-      setLite(localStorage.getItem('jilaotv-mode') === 'lite')
-    }
-  }, [fromUrl])
-
-  // 默认直接渲染完整版，服务端不再输出空白 loading。
-  if (lite === null || lite === false) return <JilaotvContent initialData={initialData} />
-  return <LiteView initialData={initialData} />
-}
 
 function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const router = useRouter()
@@ -60,11 +39,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const topic = searchParams.get('topic') ?? ''
   const searched = q.length > 0
 
-  // 分享落地：URL 只带定位线索（d/sid/sn），不含任何列表或播放数据。
-  const paramsString = searchParams.toString()
-  const share = useMemo(() => readShareTarget(new URLSearchParams(paramsString)), [paramsString])
-  // 仅捕获首屏 URL：用户交互写入的 sid 不触发还原，避免与 openDetail 打架。
-  const [bootShare] = useState(() => readShareTarget(new URLSearchParams(paramsString)))
+  // 仅首屏捕获分享线索：详情开合会写 d/sid，但不应反过来驱动搜索或还原。
+  const [bootShare] = useState(() => readShareTarget(new URLSearchParams(searchParams.toString())))
   // 空间与详情正交：space=1 即空间在场，详情由 d 叠加在上层（z-index 更高），互不否决。
   const spaceOpen = searchParams.get('space') === '1'
 
@@ -145,7 +121,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     posterAbort.current?.abort()
     posterAbort.current = null
 
-    if (share || !q) {
+    // 分享直达只在首屏让路；详情开关不改变搜索词，绝不触发重搜。
+    if (bootShare || !q) {
       setLoading(false)
       setStreaming(false)
       return
@@ -173,7 +150,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       }
     })
     return () => { ctrl.abort(); posterAbort.current?.abort() }
-  }, [q, share])
+  }, [q, bootShare])
 
   // ---- 缺图补图：按片名去重，流式每批只对新片名请求一次，不重复打 TMDb ----
   useEffect(() => {
@@ -624,7 +601,7 @@ export default function JilaotvClient({
 }) {
   return (
     <Suspense fallback={fallback}>
-      <ModeRouter initialData={initialData} />
+      <JilaotvContent initialData={initialData} />
     </Suspense>
   )
 }
