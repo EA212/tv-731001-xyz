@@ -1,5 +1,6 @@
 import express from "express";
 import axios from "axios";
+import { SITES, searchAll } from "../_lib/search-core.js";
 
 const app = express();
 
@@ -34,41 +35,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 写死的接口配置（直接在代码中修改）
-const SITES = [
-  { key: "ffzy", name: "非凡影视", api: "https://api.ffzyapi.com/api.php/provide/vod", active: true },
-  { key: "bfzy", name: "暴风资源", api: "https://bfzyapi.com/api.php/provide/vod", active: true },
-  { key: "dyttzy", name: "电影天堂", api: "http://caiji.dyttzyapi.com/api.php/provide/vod", active: true },
-  { key: "tyyszy", name: "天涯资源", api: "https://tyyszy.com/api.php/provide/vod", active: true },
-  { key: "zy360", name: "360资源", api: "https://360zy.com/api.php/provide/vod", active: true },
-  { key: "maotaizy", name: "茅台资源", api: "https://caiji.maotaizy.cc/api.php/provide/vod", active: true },
-  { key: "wolong", name: "卧龙资源", api: "https://wolongzyw.com/api.php/provide/vod", active: true },
-  { key: "jisu", name: "极速资源", api: "https://jszyapi.com/api.php/provide/vod", active: true },
-  { key: "dbzy", name: "豆瓣资源", api: "https://dbzy.tv/api.php/provide/vod", active: true },
-  { key: "mozhua", name: "魔爪资源", api: "https://mozhuazy.com/api.php/provide/vod", active: true },
-  { key: "mdzy", name: "魔都资源", api: "https://www.mdzyapi.com/api.php/provide/vod", active: true },
-  { key: "zuid", name: "最大资源", api: "https://api.zuidapi.com/api.php/provide/vod", active: true },
-  { key: "yinghua", name: "樱花资源", api: "https://m3u8.apiyhzy.com/api.php/provide/vod", active: true },
-  { key: "wujin", name: "无尽资源", api: "https://api.wujinapi.me/api.php/provide/vod", active: true },
-  { key: "wwzy", name: "旺旺短剧", api: "https://wwzy.tv/api.php/provide/vod", active: true },
-  { key: "ikun", name: "iKun资源", api: "https://ikunzyapi.com/api.php/provide/vod", active: true },
-  { key: "lzi", name: "量子资源", api: "https://cj.lziapi.com/api.php/provide/vod", active: true },
-  { key: "bdzy", name: "百度资源", api: "https://api.apibdzy.com/api.php/provide/vod", active: true },
-  { key: "hongniuzy", name: "红牛资源", api: "https://www.hongniuzy2.com/api.php/provide/vod", active: true },
-  { key: "xinlangaa", name: "新浪资源", api: "https://api.xinlangapi.com/xinlangapi.php/provide/vod", active: true },
-  { key: "ckzy", name: "CK资源", api: "https://ckzy.me/api.php/provide/vod", active: true },
-  { key: "ukuapi", name: "U酷资源", api: "https://api.ukuapi.com/api.php/provide/vod", active: true },
-  { key: "1080zyk", name: "1080资源", api: "https://api.1080zyku.com/inc/apijson.php/", active: true },
-  { key: "hhzyapi", name: "豪华资源", api: "https://hhzyapi.com/api.php/provide/vod", active: true },
-  { key: "subocaiji", name: "速博资源", api: "https://subocaiji.com/api.php/provide/vod", active: true },
-  { key: "p2100", name: "飘零资源", api: "https://p2100.net/api.php/provide/vod", active: true },
-  { key: "aqyzy", name: "爱奇艺", api: "https://iqiyizyapi.com/api.php/provide/vod", active: true },
-  { key: "yzzy", name: "优质资源", api: "https://api.yzzy-api.com/inc/apijson.php", active: true },
-  { key: "myzy", name: "猫眼资源", api: "https://api.maoyanapi.top/api.php/provide/vod", active: true },
-  { key: "rycj", name: "如意资源", api: "https://cj.rycjapi.com/api.php/provide/vod", active: true },
-  { key: "jinyingzy", name: "金鹰点播", api: "https://jinyingzy.com/api.php/provide/vod", active: true },
-  { key: "guangsuapi", name: "光速资源", api: "https://api.guangsuapi.com/api.php/provide/vod", active: true }
-];
+// 站点表与抓取逻辑统一由 _lib/search-core.js 提供（下划线前缀为内部模块，不生成路由），流式与一次性端点共用。
 
 // 根路由
 app.get("/", (req, res) => {
@@ -138,70 +105,18 @@ app.get("/hot", async (req, res) => {
   res.json({ list: [] });
 });
 
-// 搜索接口
+// 搜索接口（一次性）：流式端点的降级目标，与 /api/search-stream 共用抓取逻辑。
+// ac=detail 优先带海报，避免前端逐片名打 TMDb 补图；结果裁剪成 6 个字段回前端。
 app.get("/search", async (req, res) => {
-  const { wd } = req.query;
-  console.log('\n🔍 ========================================');
-  console.log(`🔍 [搜索] 关键词: "${wd}"`);
-  console.log(`🔍 [搜索] 时间: ${new Date().toLocaleTimeString()}`);
-  
-  if (!wd) {
-    console.log('⚠️ [搜索] 关键词为空，返回空结果');
-    return res.json({ list: [] });
-  }
-  
-  const activeSites = SITES.filter(s => s.active);
-  console.log(`📡 [搜索] 活跃站点数: ${activeSites.length}`);
-  console.log(`📡 [搜索] 站点列表: ${activeSites.map(s => s.name).join(', ')}`);
-  
-  // 优先 ac=detail：实测 ac=list 在非凡、极速等站不返回 vod_pic，导致搜索
-  // 海报全靠前端逐片名打 TMDb 补图（一次搜索几十并发，容易撞限流）。
-  // detail 带图但响应体大几倍，所以在这里裁剪成 6 个字段再回前端；图片由
-  // 用户浏览器直连各站图床，IP 天然分散，不经过本函数、也不碰任何密钥。
-  const promises = activeSites.map(async (site) => {
-    const startTime = Date.now();
+  const wd = String(req.query.wd ?? "").trim().slice(0, 80);
+  if (!wd) return res.json({ list: [] });
 
-    for (const ac of ["detail", "list"]) {
-      try {
-        const url = `${site.api}?ac=${ac}&wd=${encodeURIComponent(wd)}&out=json`;
-        const response = await axios.get(url, { timeout: 6000 });
-        const list = response.data?.list || response.data?.data;
-
-        if (Array.isArray(list) && list.length > 0) {
-          const duration = Date.now() - startTime;
-          console.log(`✅ [搜索][${site.name}] ${ac} - ${list.length} 条 - ${duration}ms`);
-          return list.slice(0, 20).map(item => ({
-            vod_name: item.vod_name,
-            vod_pic: item.vod_pic || "",
-            vod_id: item.vod_id,
-            site_key: site.key,
-            site_name: site.name,
-            latency: duration
-          }));
-        }
-      } catch (e) {
-        console.log(`⚠️ [搜索][${site.name}] ${ac} 失败: ${e.code || "unknown"}`);
-      }
-    }
-    return [];
+  const list = [];
+  await searchAll(wd, {
+    deadline: 12_000,
+    onBatch: ({ items }) => list.push(...items)
   });
-  
-  console.log('⏳ [搜索] 等待所有站点响应...');
-  const results = await Promise.all(promises);
-  const flatResults = results.flat();
-  
-  console.log(`\n📊 [搜索] 汇总结果:`);
-  console.log(`📊 [搜索] 总结果数: ${flatResults.length} 条`);
-  
-  // 统计各站点结果
-  const siteStats = {};
-  flatResults.forEach(item => {
-    siteStats[item.site_name] = (siteStats[item.site_name] || 0) + 1;
-  });
-  console.log(`📊 [搜索] 各站点统计:`, siteStats);
-  
-  console.log('🔍 ========================================\n');
-  res.json({ list: flatResults });
+  res.json({ list });
 });
 
 // 详情接口

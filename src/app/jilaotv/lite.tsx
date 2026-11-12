@@ -4,6 +4,7 @@
 import { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { fetchJson } from '../../lib/api'
+import { streamSearch } from '../../lib/search-stream'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { Poster } from '../../components/Poster'
 import { SECTIONS } from '../../components/Cards'
@@ -43,6 +44,7 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
   const [keyword, setKeyword] = useState(q)
   const [rawList, setRawList] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [showDetail, setShowDetail] = useState(false)
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null)
   const [episodeList, setEpisodeList] = useState<Episode[]>([])
@@ -52,15 +54,24 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
 
   useEffect(() => {
     setKeyword(q)
-    if (share) { setRawList([]); setLoading(false); return }
-    if (!q) { setRawList([]); setLoading(false); return }
+    setRawList([])
+    if (share || !q) { setLoading(false); setStreaming(false); return }
     const ctrl = new AbortController()
     setLoading(true)
-    setRawList([])
-    fetchJson<{ list?: SearchResult[] }>(`/api/search?wd=${encodeURIComponent(q)}`, ctrl.signal)
-      .then(res => { if (!ctrl.signal.aborted) setRawList(res.list ?? []) })
-      .catch(() => { if (!ctrl.signal.aborted) setRawList([]) })
-      .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
+    setStreaming(true)
+    streamSearch(q, {
+      signal: ctrl.signal,
+      onBatch: items => {
+        if (ctrl.signal.aborted) return
+        setRawList(prev => prev.concat(items))
+        setLoading(false)
+      },
+      onDone: () => {
+        if (!ctrl.signal.aborted) { setLoading(false); setStreaming(false) }
+      }
+    }).catch(() => {
+      if (!ctrl.signal.aborted) { setLoading(false); setStreaming(false) }
+    })
     return () => ctrl.abort()
   }, [q, share])
 
@@ -176,9 +187,9 @@ export default function LiteView({ initialData }: { initialData: StaticData }) {
 
       {searched && (
         <section className="lite-section">
-          <h2 className="lite-section-title">搜索结果 ({rawList.length})</h2>
+          <h2 className="lite-section-title">搜索结果 ({rawList.length}){streaming ? ' · 继续搜索中' : ''}</h2>
           {loading && <p className="lite-loading">加载中...</p>}
-          {!loading && groups.length === 0 && <p className="lite-loading">未找到相关结果</p>}
+          {!loading && !streaming && groups.length === 0 && <p className="lite-loading">未找到相关结果</p>}
           {groups.map(group => (
             <LiteRow
               key={group.name}

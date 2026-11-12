@@ -257,6 +257,17 @@ input { font: inherit; }
 /* ============ 搜索结果 ============ */
 .search-result-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .search-result-head .section-header { margin-bottom: 16px; }
+.stream-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+  animation: fade-in 0.3s ease;
+}
+.stream-progress .spin { width: 13px; height: 13px; }
 .btn-clear { padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
 .result-grid {
   display: grid;

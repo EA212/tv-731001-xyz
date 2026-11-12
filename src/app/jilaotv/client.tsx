@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
+import { streamSearch } from '../../lib/search-stream'
 import { lookupPoster, isBadPic, setStaticPosters } from '../../lib/poster'
 import { groupResults, parseEpisodes } from '../../lib/data'
 import { applyShareParams, clearShareParams, readShareTarget } from '../../lib/deeplink'
@@ -69,7 +70,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const [spaceLoaded, setSpaceLoaded] = useState(false)
   const [keyword, setKeyword] = useState(q)
   const [rawList, setRawList] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false)   // 首批尚未到达
+  const [streaming, setStreaming] = useState(false) // 首批已到，仍在收后续站点
   const [imageMap, setImageMap] = useState<Record<string, string>>({})
   const [scrolled, setScrolled] = useState(false)
   const [heroIndex, setHeroIndex] = useState(0)
@@ -86,6 +88,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
   const dplayerRef = useRef<DPlayerInstance | null>(null)
   const detailAbort = useRef<AbortController | null>(null)
   const speedAbort = useRef<AbortController | null>(null)
+  const posterRequested = useRef(new Set<string>())
+  const posterAbort = useRef<AbortController | null>(null)
 
   // 静态索引只需在客户端注册一次；数据本身由服务端直出，无额外请求。
   useEffect(() => setStaticPosters(initialData), [initialData])
@@ -131,45 +135,61 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     return () => window.clearInterval(id)
   }, [heroList.length])
 
-  // ---- 搜索：q 变化即请求；分享直达时让路，绝不重跑全量搜索 ----
+  // ---- 搜索：流式逐批到达，首批即可渲染；分享直达时让路，绝不重跑全量搜索 ----
   useEffect(() => {
     setKeyword(q)
-    if (share) {
-      setRawList([])
-      setImageMap({})
-      setLoading(false)
-      return
-    }
-    if (!q) {
-      setRawList([])
-      setImageMap({})
-      setLoading(false)
-      return
-    }
-    const ctrl = new AbortController()
-    setLoading(true)
     setRawList([])
     setImageMap({})
-    fetchJson<{ list?: SearchResult[] }>(`/api/search?wd=${encodeURIComponent(q)}`, ctrl.signal)
-      .then(res => { if (!ctrl.signal.aborted) setRawList(res.list ?? []) })
-      .catch(err => { if (!ctrl.signal.aborted) console.error('搜索失败', err) })
-      .finally(() => { if (!ctrl.signal.aborted) setLoading(false) })
-    return () => ctrl.abort()
+    posterRequested.current.clear()
+    posterAbort.current?.abort()
+    posterAbort.current = null
+
+    if (share || !q) {
+      setLoading(false)
+      setStreaming(false)
+      return
+    }
+
+    const ctrl = new AbortController()
+    posterAbort.current = new AbortController()
+    setLoading(true)
+    setStreaming(true)
+    streamSearch(q, {
+      signal: ctrl.signal,
+      onBatch: items => {
+        if (ctrl.signal.aborted) return
+        setRawList(prev => prev.concat(items))
+        setLoading(false) // 首批到达即出卡片，不等最慢站点
+      },
+      onDone: () => {
+        if (!ctrl.signal.aborted) { setLoading(false); setStreaming(false) }
+      }
+    }).catch(err => {
+      if (!ctrl.signal.aborted) {
+        console.error('搜索失败', err)
+        setLoading(false)
+        setStreaming(false)
+      }
+    })
+    return () => { ctrl.abort(); posterAbort.current?.abort() }
   }, [q, share])
 
-  // ---- 缺图补图：并发拉取，一次批量写入 state ----
+  // ---- 缺图补图：按片名去重，流式每批只对新片名请求一次，不重复打 TMDb ----
   useEffect(() => {
     if (!ENABLE_TMDB_POSTER_FALLBACK || rawList.length === 0) return
+    const ctrl = posterAbort.current
+    if (!ctrl) return
     const names = [...new Set(rawList.filter(i => isBadPic(i.vod_pic)).map(i => i.vod_name))]
-    const ctrl = new AbortController()
-    let cancelled = false
-    Promise.all(names.map(name => lookupPoster(name, ctrl.signal))).then(urls => {
-      if (cancelled) return
-      const next: Record<string, string> = {}
-      names.forEach((name, i) => { if (urls[i]) next[name] = urls[i]! })
-      if (Object.keys(next).length) setImageMap(next)
+      .filter(name => name && !posterRequested.current.has(name))
+    if (names.length === 0) return
+    names.forEach(name => posterRequested.current.add(name))
+    names.forEach(name => {
+      lookupPoster(name, ctrl.signal)
+        .then(url => {
+          if (url && !ctrl.signal.aborted) setImageMap(prev => ({ ...prev, [name]: url }))
+        })
+        .catch(() => posterRequested.current.delete(name))
     })
-    return () => { cancelled = true; ctrl.abort() }
   }, [rawList])
 
   // ---- 派生数据：只在 rawList 变化时重算 ----
@@ -475,6 +495,11 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
           <div className="section-header">
             <div className="section-line" />
             <h2 className="section-title">搜索结果</h2>
+            {streaming && (
+              <span className="stream-progress" role="status">
+                <Loader2 className="spin" /> 继续搜索更多片源
+              </span>
+            )}
           </div>
           <button type="button" className="btn-clear" onClick={clearSearch}>清除搜索 ×</button>
         </div>
@@ -486,6 +511,8 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
               <ResultCard key={group.name} group={group} poster={imageMap[group.name]} onOpen={openDetail} />
             ))}
           </div>
+        ) : streaming ? (
+          <div className="loading-row"><Loader2 className="spin" /></div>
         ) : (
           <p className="empty-hint">未找到相关内容，请尝试更换关键词</p>
         )}
