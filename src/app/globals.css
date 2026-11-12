@@ -344,8 +344,21 @@ input { font: inherit; }
 .latency-text { color: var(--text-dim); font-size: 11px; }
 .ep-btn { border-radius: var(--radius-sm); }
 
-.footer { text-align: center; padding: 40px var(--page-x) 16px; color: var(--text-dim); font-size: 13px; }
+.footer { position: relative; text-align: center; padding: 40px var(--page-x) 16px; color: var(--text-dim); font-size: 13px; }
 .footer-sub { margin-top: 6px; font-size: 11px; opacity: 0.65; }
+/* 构建标识：绝对定位在页脚留白里，不占行、不增高 */
+.build-stamp {
+  position: absolute;
+  top: 12px;
+  right: var(--page-x);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.3px;
+  color: var(--text-dim);
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+}
 
 /* ============ 边缘续拉提示 ============ */
 .pull-hint {

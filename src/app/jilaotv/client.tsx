@@ -13,6 +13,7 @@ import { groupResults, parseEpisodes } from '../../lib/data'
 import { applyShareParams, clearShareParams, readShareTarget } from '../../lib/deeplink'
 import type { ShareTarget } from '../../lib/deeplink'
 import { ResultCard, HotSection, SECTIONS } from '../../components/Cards'
+import { BuildStamp } from '../../components/BuildStamp'
 import { PullHint } from '../../components/PullHint'
 import { usePullToContinue } from '../../lib/use-pull-to-continue'
 import type { CuratedFilm } from '../../lib/curate'
@@ -221,13 +222,15 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     speedAbort.current?.abort()
   }, [])
 
-  // ---- 操作：URL 是唯一状态源，所有跳转基于当前参数增删，不丢 space/topic/q/d ----
+  // ---- 操作：写入以地址栏为唯一真相，不依赖 React 快照，连续调用不互相覆盖 ----
   const updateParams = useCallback((mutate: (p: URLSearchParams) => void) => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(window.location.search)
     mutate(params)
     const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [searchParams, pathname, router])
+    const next = qs ? `${pathname}?${qs}` : pathname
+    if (next === window.location.pathname + window.location.search) return
+    router.push(next, { scroll: false })
+  }, [pathname, router])
 
   const doSearch = useCallback((value: string) => {
     const kw = value.trim()
@@ -504,6 +507,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       <footer className="footer">
         <div>机佬TV 改编 爱吃王哥呆阿龟头 原创</div>
         <div className="footer-sub">片源与海报来自公开影视资料库</div>
+        <BuildStamp />
       </footer>
 
       {/* 到底再下滑：进入策展空间 */}
