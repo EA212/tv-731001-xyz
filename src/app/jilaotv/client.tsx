@@ -121,8 +121,9 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     posterAbort.current?.abort()
     posterAbort.current = null
 
-    // 分享直达只在首屏让路；详情开关不改变搜索词，绝不触发重搜。
-    if (bootShare || !q) {
+    // 搜索只由 q 驱动：详情开合不改 q，所以开/关详情永不重搜；
+    // 分享落地也照常补齐列表，接收者关掉详情就能看到同一批结果。
+    if (!q) {
       setLoading(false)
       setStreaming(false)
       return
@@ -150,7 +151,7 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
       }
     })
     return () => { ctrl.abort(); posterAbort.current?.abort() }
-  }, [q, bootShare])
+  }, [q])
 
   // ---- 缺图补图：按片名去重，流式每批只对新片名请求一次，不重复打 TMDb ----
   useEffect(() => {
