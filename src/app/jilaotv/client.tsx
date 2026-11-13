@@ -253,7 +253,13 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     })
   }, [doSearch])
 
-  const openSpace = useCallback(() => updateParams(p => p.set('space', '1')), [updateParams])
+  // 进入影展即切换上下文：URL 只表达影展，不带搜索词，也不带上一步的详情线索。
+  const openSpace = useCallback(() => updateParams(p => {
+    clearShareParams(p)
+    p.delete('q')
+    p.delete('topic')
+    p.set('space', '1')
+  }), [updateParams])
   usePullToContinue(openSpace, !spaceOpen && !showDetail, pullHint)
   const closeSpace = useCallback(() => updateParams(p => {
     p.delete('space'); p.delete('topic'); clearShareParams(p)
