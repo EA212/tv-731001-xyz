@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import type { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Search, Play, X, Tv, Loader2, Sun, Moon, Sparkles, ChevronRight } from 'lucide-react'
 import { fetchJson, loadScript } from '../../lib/api'
 import { streamSearch } from '../../lib/search-stream'
@@ -30,8 +30,6 @@ const getLatencyClass = (ms: number) =>
   ms < 500 ? 'dot-green' : ms < 2000 ? 'dot-yellow' : 'dot-red'
 
 function JilaotvContent({ initialData }: { initialData: StaticData }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
 
   // URL 是唯一状态源：搜索、刷新恢复、浏览器前进/后退都由它驱动。
@@ -222,15 +220,17 @@ function JilaotvContent({ initialData }: { initialData: StaticData }) {
     speedAbort.current?.abort()
   }, [])
 
-  // ---- 操作：写入以地址栏为唯一真相，不依赖 React 快照，连续调用不互相覆盖 ----
+  // ---- 操作：URL 是唯一状态源。纯客户端参数用原生 History API 即时写入，
+  //      useSearchParams 同步派生 UI：不触发 RSC、无异步滞后、连续写入不互相覆盖。 ----
   const updateParams = useCallback((mutate: (p: URLSearchParams) => void) => {
-    const params = new URLSearchParams(window.location.search)
+    const current = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(current)
     mutate(params)
     const qs = params.toString()
-    const next = qs ? `${pathname}?${qs}` : pathname
-    if (next === window.location.pathname + window.location.search) return
-    router.push(next, { scroll: false })
-  }, [pathname, router])
+    if (qs === current.toString()) return
+    const path = window.location.pathname
+    history.pushState(null, '', qs ? `${path}?${qs}` : path)
+  }, [])
 
   const doSearch = useCallback((value: string) => {
     const kw = value.trim()
